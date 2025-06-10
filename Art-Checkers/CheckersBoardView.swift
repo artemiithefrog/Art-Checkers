@@ -61,9 +61,20 @@ struct CheckersBoardView: View {
                         HStack(spacing: -10) {
                             ForEach(0..<min(game.capturedWhitePieces, 5), id: \.self) { index in
                                 Circle()
-                                    .fill(Color.white)
+                                    .fill(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [Color.white, Color.white.opacity(0.8)]),
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
                                     .frame(width: 30, height: 30)
                                     .shadow(radius: 2)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.black.opacity(0.3), lineWidth: 1)
+                                            .padding(4)
+                                    )
                             }
                         }
                     }
@@ -291,9 +302,20 @@ struct CheckersBoardView: View {
                         HStack(spacing: -10) {
                             ForEach(0..<min(game.capturedBlackPieces, 5), id: \.self) { index in
                                 Circle()
-                                    .fill(Color.black)
+                                    .fill(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [Color.black.opacity(0.8), Color.black]),
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
                                     .frame(width: 30, height: 30)
-                                    .shadow(radius: 2)
+                                    .shadow(color: .white, radius: 2, x: 0, y: 0)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                            .padding(4)
+                                    )
                             }
                         }
                     }
@@ -425,11 +447,28 @@ struct PieceView: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(piece.color == .white ? Color.white : Color.black)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            piece.color == .white ? Color.white : Color.black.opacity(0.8),
+                            piece.color == .white ? Color.white.opacity(0.8) : Color.black
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .frame(width: size, height: size)
                 .shadow(radius: 2)
+                .overlay(
+                    Circle()
+                        .stroke(
+                            piece.color == .white ? Color.black.opacity(0.3) : Color.white.opacity(0.3),
+                            lineWidth: 1
+                        )
+                        .padding(size * 0.15)
+                )
             
-            if piece.type == .king {
+            if piece.isKing {
                 Image(systemName: "crown.fill")
                     .foregroundColor(piece.color == .white ? .black : .white)
                     .font(.system(size: size * 0.4))
