@@ -168,24 +168,27 @@ class CheckersGame: ObservableObject {
             return isValidKingMove(from: from, to: to)
         }
         
-        if abs(rowDiff) == 2 {
+        if abs(rowDiff) == 1 && abs(colDiff) == 1 {
+            if hasAnyCaptureMoves() {
+                return false
+            }
+            
+            if piece.color == .white && rowDiff >= 0 { return false }
+            if piece.color == .black && rowDiff <= 0 { return false }
+            
+            return true
+        }
+        
+        if abs(rowDiff) == 2 && abs(colDiff) == 2 {
             let capturedRow = (from.row + to.row) / 2
             let capturedCol = (from.col + to.col) / 2
+            
             guard let capturedPiece = board[capturedRow][capturedCol] else { return false }
             if capturedPiece.color == piece.color { return false }
             return true
         }
         
-        if hasAnyCaptureMoves() {
-            return false
-        }
-        
-        if piece.type == .normal {
-            if piece.color == .white && rowDiff >= 0 { return false }
-            if piece.color == .black && rowDiff <= 0 { return false }
-        }
-        
-        return true
+        return false
     }
     
     func isValidKingMove(from: Position, to: Position) -> Bool {
