@@ -20,6 +20,10 @@ class GameRoom: NSObject, ObservableObject {
         setupSession()
     }
     
+    deinit {
+        disconnect()
+    }
+    
     private func setupSession() {
         session = MCSession(peer: myPeerId, securityIdentity: nil, encryptionPreference: .required)
         session?.delegate = self
@@ -27,12 +31,11 @@ class GameRoom: NSObject, ObservableObject {
     }
     
     func startHosting(settings: GameSettings) {
-        stopHosting()
-        stopBrowsing()
-
+        disconnect()
+        
         isHost = true
         gameSettings = settings
-
+        
         advertiser = MCNearbyServiceAdvertiser(peer: myPeerId, discoveryInfo: nil, serviceType: serviceType)
         advertiser?.delegate = self
         advertiser?.startAdvertisingPeer()
@@ -40,16 +43,9 @@ class GameRoom: NSObject, ObservableObject {
         statusMessage = "Room created"
     }
     
-    func stopHosting() {
-        advertiser?.stopAdvertisingPeer()
-        advertiser = nil
-        isHost = false
-    }
-    
     func startBrowsing() {
-        stopHosting()
-        stopBrowsing()
-
+        disconnect()
+        
         isSearching = true
         browser = MCNearbyServiceBrowser(peer: myPeerId, serviceType: serviceType)
         browser?.delegate = self
@@ -62,11 +58,20 @@ class GameRoom: NSObject, ObservableObject {
         browser?.stopBrowsingForPeers()
         browser = nil
         isSearching = false
+        statusMessage = "Search stopped"
     }
     
     func disconnect() {
-        stopHosting()
-        stopBrowsing()
+        if isHost {
+            advertiser?.stopAdvertisingPeer()
+            advertiser = nil
+            isHost = false
+        }
+        
+        if isSearching {
+            stopBrowsing()
+        }
+        
         session?.disconnect()
         connectedPeers.removeAll()
         statusMessage = "Disconnected"
