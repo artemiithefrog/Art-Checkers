@@ -29,6 +29,8 @@ class CheckersGame: ObservableObject {
     @Published var possibleMoves: Set<Position> = []
     @Published var hasCaptureMoves: Bool = false
     @Published var lastCapturePosition: Position?
+    @Published var gameOver: Bool = false
+    @Published var winner: PieceColor?
     
     init() {
         setupBoard()
@@ -297,6 +299,34 @@ class CheckersGame: ObservableObject {
         
         lastCapturePosition = nil
         currentPlayer = currentPlayer == .white ? .black : .white
+        
+        // Check for game over after move
+        checkGameOver()
+    }
+    
+    private func checkGameOver() {
+        var whitePieces = 0
+        var blackPieces = 0
+        
+        for row in 0..<8 {
+            for col in 0..<8 {
+                if let piece = board[row][col] {
+                    if piece.color == .white {
+                        whitePieces += 1
+                    } else {
+                        blackPieces += 1
+                    }
+                }
+            }
+        }
+        
+        if whitePieces == 0 {
+            gameOver = true
+            winner = .black
+        } else if blackPieces == 0 {
+            gameOver = true
+            winner = .white
+        }
     }
     
     func getPossibleMoves(for piece: Piece) -> Set<Position> {
