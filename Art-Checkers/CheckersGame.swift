@@ -15,6 +15,7 @@ struct Piece: Identifiable {
     var color: PieceColor
     var type: PieceType
     var position: Position
+    var isKing: Bool = false
 }
 
 struct Position: Hashable {
@@ -249,59 +250,50 @@ class CheckersGame: ObservableObject {
     }
     
     func makeMove(from: Position, to: Position) {
-        guard isValidMove(from: from, to: to) else { return }
-        
-        var piece = board[from.row][from.col]!
-        piece.position = to
-        board[to.row][to.col] = piece
-        board[from.row][from.col] = nil
-        
-        if piece.type == .king {
-            let rowDiff = to.row - from.row
-            let colDiff = to.col - from.col
-            let rowDir = rowDiff > 0 ? 1 : -1
-            let colDir = colDiff > 0 ? 1 : -1
-            
-            var currentRow = from.row + rowDir
-            var currentCol = from.col + colDir
-            
-            while currentRow != to.row && currentCol != to.col {
-                if board[currentRow][currentCol] != nil {
-                    board[currentRow][currentCol] = nil
-                    if hasCaptureMovesForPiece(piece, from: to) {
-                        lastCapturePosition = to
-                        return
-                    }
-                    break
-                }
-                currentRow += rowDir
-                currentCol += colDir
+        if isValidMove(from: from, to: to) {
+            board[to.row][to.col] = board[from.row][from.col]
+            board[from.row][from.col] = nil
+
+            if to.row == 0 && board[to.row][to.col]?.color == .white {
+                board[to.row][to.col]?.isKing = true
+            } else if to.row == 7 && board[to.row][to.col]?.color == .black {
+                board[to.row][to.col]?.isKing = true
             }
-        } else {
-            let rowDiff = to.row - from.row
-            let colDiff = to.col - from.col
-            if abs(rowDiff) == 2 {
+            
+            if abs(to.row - from.row) == 2 {
                 let capturedRow = (from.row + to.row) / 2
                 let capturedCol = (from.col + to.col) / 2
                 board[capturedRow][capturedCol] = nil
-                
-                if hasCaptureMovesForPiece(piece, from: to) {
-                    lastCapturePosition = to
-                    return
+            }
+            
+            currentPlayer = currentPlayer == .white ? .black : .white
+            checkGameOver()
+        }
+    }
+    
+    func reset() {
+        board = Array(repeating: Array(repeating: nil, count: 8), count: 8)
+
+        for row in 0..<3 {
+            for col in 0..<8 {
+                if (row + col) % 2 == 1 {
+                    board[row][col] = Piece(color: .black, type: .normal, position: Position(row: row, col: col))
                 }
             }
         }
-        
-        if (piece.color == .white && to.row == 0) || (piece.color == .black && to.row == 7) {
-            piece.type = .king
-            board[to.row][to.col] = piece
+
+        for row in 5..<8 {
+            for col in 0..<8 {
+                if (row + col) % 2 == 1 {
+                    board[row][col] = Piece(color: .white, type: .normal, position: Position(row: row, col: col))
+                }
+            }
         }
-        
-        lastCapturePosition = nil
-        currentPlayer = currentPlayer == .white ? .black : .white
-        
-        // Check for game over after move
-        checkGameOver()
+
+        currentPlayer = .white
+
+        gameOver = false
+        winner = nil
     }
     
     private func checkGameOver() {
@@ -432,3 +424,4 @@ class CheckersGame: ObservableObject {
         return moves
     }
 } 
+

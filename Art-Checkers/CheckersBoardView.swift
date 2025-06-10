@@ -279,6 +279,7 @@ struct CheckersBoardView: View {
         .alert("Exit Game", isPresented: $showExitAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Exit", role: .destructive) {
+                game.reset()
                 showGame = false
             }
         } message: {
