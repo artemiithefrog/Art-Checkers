@@ -79,7 +79,7 @@ struct BoardView: View {
                                             height: CGFloat(rowDiff) * squareSize
                                         )
                                     }
-
+                                    
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                             game.makeMove(from: selected, to: position)
@@ -95,7 +95,7 @@ struct BoardView: View {
                             }
                     }
                 }
-
+                
                 ForEach(0..<8) { row in
                     ForEach(0..<8) { col in
                         if let piece = game.board[row][col] {
@@ -109,19 +109,17 @@ struct BoardView: View {
                                     )
                                     .onTapGesture {
                                         if piece.color == game.currentPlayer {
-                                            withAnimation(.easeInOut(duration: 0.2)) {
-                                                selectedPosition = Position(row: row, col: col)
-                                                draggedPiece = piece
-                                                dragOffset = .zero
-                                                possibleMovesOpacity = 1
-                                            }
+                                            selectedPosition = Position(row: row, col: col)
+                                            draggedPiece = piece
+                                            dragOffset = .zero
+                                            possibleMovesOpacity = 1
                                         }
                                     }
                             }
                         }
                     }
                 }
-
+                
                 if let draggedPiece = draggedPiece,
                    let selectedPosition = selectedPosition {
                     PieceView(piece: draggedPiece, size: squareSize * 0.8)
@@ -190,12 +188,10 @@ struct BoardView: View {
                                         }
                                     }
                                     
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        self.draggedPiece = nil
-                                        self.selectedPosition = nil
-                                        self.targetPosition = nil
-                                        self.possibleMovesOpacity = 0
-                                    }
+                                    self.draggedPiece = nil
+                                    self.selectedPosition = nil
+                                    self.targetPosition = nil
+                                    self.possibleMovesOpacity = 0
                                 }
                         )
                 }
