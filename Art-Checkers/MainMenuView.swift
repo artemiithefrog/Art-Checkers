@@ -65,6 +65,7 @@ struct NewGameView: View {
     @State private var showBoardStylePicker = false
     @Binding var showGame: Bool
     @Binding var gameSettings: GameSettings?
+    @StateObject private var gameRoom = GameRoom()
     
     private let boardStyles = [
         (name: "Classic Brown", colors: (Color(red: 0.6, green: 0.4, blue: 0.2), Color(red: 0.9, green: 0.7, blue: 0.5))),
@@ -150,12 +151,25 @@ struct NewGameView: View {
             Spacer()
 
             Button(action: {
-                gameSettings = GameSettings(
+                print("🎮 NewGameView: Creating new game room")
+                print("🎮 NewGameView: Selected board style: \(boardStyles[selectedBoardStyle].name)")
+                print("🎮 NewGameView: Time per move: \(Int(timePerMove)) seconds")
+                
+                let settings = GameSettings(
                     playerColor: .white,
                     timerMode: timePerMove > 0 ? .timePerMove : .noLimit,
                     timePerMove: timePerMove,
                     boardStyle: selectedBoardStyle
                 )
+                
+                print("🎮 NewGameView: Starting game room with settings:")
+                print("  - Player Color: \(settings.playerColor)")
+                print("  - Timer Mode: \(settings.timerMode)")
+                print("  - Time Per Move: \(settings.timePerMove)")
+                print("  - Board Style: \(settings.boardStyle)")
+                
+                gameRoom.startHosting(settings: settings)
+                gameSettings = settings
                 showGame = true
                 dismiss()
             }) {
@@ -180,6 +194,12 @@ struct NewGameView: View {
             }
             .padding(.horizontal)
             .padding(.bottom, 30)
+            
+            if !gameRoom.statusMessage.isEmpty {
+                Text(gameRoom.statusMessage)
+                    .foregroundColor(.gray)
+                    .padding(.bottom, 10)
+            }
         }
         .sheet(isPresented: $showBoardStylePicker) {
             BoardStylePickerView(selectedStyle: $selectedBoardStyle)
@@ -279,6 +299,7 @@ struct BoardStylePickerView: View {
                                 style: boardStyles[index],
                                 isSelected: selectedStyle == index,
                                 action: {
+                                    print("🎨 BoardStylePickerView: Selected board style: \(boardStyles[index].name)")
                                     selectedStyle = index
                                     UserDefaultsManager.shared.saveSelectedBoardStyle(index)
                                 }
@@ -290,6 +311,7 @@ struct BoardStylePickerView: View {
             }
             .navigationBarItems(
                 trailing: Button(action: {
+                    print("🎨 BoardStylePickerView: Done selecting board style")
                     dismiss()
                 }) {
                     Text("Done")
@@ -307,6 +329,7 @@ struct AvailableRoomsView: View {
     @Binding var gameSettings: GameSettings?
     @StateObject private var gameRoom = GameRoom()
     @State private var isSearching = false
+    @State private var searchStartTime = Date()
     
     var body: some View {
         NavigationView {
@@ -329,6 +352,9 @@ struct AvailableRoomsView: View {
                         Text("Searching for rooms...")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.gray)
+                        Text("Search time: \(Int(Date().timeIntervalSince(searchStartTime)))s")
+                            .font(.system(size: 14))
+                            .foregroundColor(.gray.opacity(0.7))
                     }
                     .frame(maxHeight: .infinity)
                 } else if gameRoom.connectedPeers.isEmpty {
@@ -340,8 +366,7 @@ struct AvailableRoomsView: View {
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.gray)
                         Button(action: {
-                            isSearching = true
-                            gameRoom.startBrowsing()
+                            startSearch()
                         }) {
                             Text("Search Again")
                                 .font(.system(size: 16, weight: .medium))
@@ -401,8 +426,25 @@ struct AvailableRoomsView: View {
             )
         }
         .onAppear {
-            isSearching = true
-            gameRoom.startBrowsing()
+            startSearch()
+        }
+        .onDisappear {
+            print("🎮 AvailableRoomsView: View disappeared, stopping search")
+            gameRoom.stopBrowsing()
+        }
+    }
+    
+    private func startSearch() {
+        print("🎮 AvailableRoomsView: Starting room search")
+        isSearching = true
+        searchStartTime = Date()
+        gameRoom.startBrowsing()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+            if isSearching {
+                print("🎮 AvailableRoomsView: Search timeout reached")
+                isSearching = false
+            }
         }
     }
 }
