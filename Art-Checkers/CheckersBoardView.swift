@@ -154,17 +154,15 @@ struct CheckersBoardView: View {
                                             }
                                             
                                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                    game.makeMove(from: selected, to: position)
-                                                    self.draggedPiece = nil
-                                                    self.selectedPosition = nil
-                                                    self.targetPosition = nil
-                                                    self.possibleMovesOpacity = 0
-                                                    self.moveOffset = .zero
-                                                    self.isMoving = false
-                                                    if settings.timePerMove > 0 {
-                                                        resetTimers()
-                                                    }
+                                                game.makeMove(from: selected, to: position)
+                                                self.draggedPiece = nil
+                                                self.selectedPosition = nil
+                                                self.targetPosition = nil
+                                                self.possibleMovesOpacity = 0
+                                                self.moveOffset = .zero
+                                                self.isMoving = false
+                                                if settings.timePerMove > 0 {
+                                                    resetTimers()
                                                 }
                                             }
                                         }
