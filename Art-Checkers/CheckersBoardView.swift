@@ -12,6 +12,22 @@ struct CheckersBoardView: View {
     @State private var moveOffset: CGSize = .zero
     @State private var isMoving: Bool = false
     @State private var showExitAlert = false
+    @State private var whiteTimeRemaining: Int
+    @State private var blackTimeRemaining: Int
+    @State private var timer: Timer?
+    @State private var isFirstMove = true
+    
+    init(game: CheckersGame, selectedPosition: Binding<Position?>, draggedPiece: Binding<Piece?>, dragOffset: Binding<CGSize>, settings: GameSettings, showGame: Binding<Bool>) {
+        self.game = game
+        self._selectedPosition = selectedPosition
+        self._draggedPiece = draggedPiece
+        self._dragOffset = dragOffset
+        self.settings = settings
+        self._showGame = showGame
+        self._whiteTimeRemaining = State(initialValue: Int(settings.timePerMove))
+        self._blackTimeRemaining = State(initialValue: Int(settings.timePerMove))
+        self._isFirstMove = State(initialValue: true)
+    }
     
     var body: some View {
         ZStack {
@@ -37,7 +53,25 @@ struct CheckersBoardView: View {
                         .frame(width: 44, height: 44)
                 }
                 .padding(.horizontal)
-                
+
+                Spacer()
+                 
+                HStack {
+                    if settings.timePerMove > 0 {
+                        HStack {
+                            Text("\(formatTime(blackTimeRemaining))")
+                                .font(.system(.title2, design: .monospaced))
+                                .foregroundColor(.white)
+                                .padding(8)
+                                .background(Color.black)
+                                .cornerRadius(8)
+                                .shadow(radius: 2)
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, -20)
+                    }
+                    Spacer()
+                }
                 GeometryReader { geometry in
                     let squareSize = min(geometry.size.width, geometry.size.height) / 8
                     
@@ -97,6 +131,9 @@ struct CheckersBoardView: View {
                                                     self.possibleMovesOpacity = 0
                                                     self.moveOffset = .zero
                                                     self.isMoving = false
+                                                    if settings.timePerMove > 0 {
+                                                        resetTimers()
+                                                    }
                                                 }
                                             }
                                         }
@@ -189,6 +226,9 @@ struct CheckersBoardView: View {
                                                 if pieceOverlap >= 0.4 && game.isValidMove(from: selectedPosition, to: targetPosition) {
                                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                                         game.makeMove(from: selectedPosition, to: targetPosition)
+                                                        if settings.timePerMove > 0 {
+                                                            resetTimers()
+                                                        }
                                                     }
                                                 } else {
                                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -212,6 +252,24 @@ struct CheckersBoardView: View {
                 }
                 .aspectRatio(1, contentMode: .fit)
                 .padding()
+                
+                HStack {
+                    if settings.timePerMove > 0 {
+                        HStack {
+                            Text("\(formatTime(whiteTimeRemaining))")
+                                .font(.system(.title2, design: .monospaced))
+                                .foregroundColor(.white)
+                                .padding(8)
+                                .background(Color.black)
+                                .cornerRadius(8)
+                                .shadow(radius: 2)
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, -20)
+                    }
+                    Spacer()
+                }
+                Spacer()
             }
             
             if game.gameOver, let winner = game.winner {
@@ -225,6 +283,15 @@ struct CheckersBoardView: View {
             }
         } message: {
             Text("Are you sure you want to exit the game?")
+        }
+        .onAppear {
+            if settings.timePerMove > 0 {
+                startTimer()
+            }
+        }
+        .onDisappear {
+            timer?.invalidate()
+            timer = nil
         }
     }
     
@@ -276,6 +343,45 @@ struct CheckersBoardView: View {
         let pieceArea = pieceSize * pieceSize
         
         return intersectionArea / pieceArea
+    }
+    
+    private func formatTime(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let remainingSeconds = seconds % 60
+        return String(format: "%02d:%02d", minutes, remainingSeconds)
+    }
+    
+    private func startTimer() {
+        if isFirstMove {
+            return
+        }
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            if game.currentPlayer == .white {
+                if whiteTimeRemaining > 0 {
+                    whiteTimeRemaining -= 1
+                } else {
+                    timer?.invalidate()
+                    game.gameOver = true
+                    game.winner = .black
+                }
+            } else {
+                if blackTimeRemaining > 0 {
+                    blackTimeRemaining -= 1
+                } else {
+                    timer?.invalidate()
+                    game.gameOver = true
+                    game.winner = .white
+                }
+            }
+        }
+    }
+    
+    private func resetTimers() {
+        whiteTimeRemaining = Int(settings.timePerMove)
+        blackTimeRemaining = Int(settings.timePerMove)
+        isFirstMove = false
+        startTimer()
     }
 }
 
