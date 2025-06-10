@@ -56,154 +56,244 @@ struct MainMenuView: View {
 
 struct NewGameView: View {
     @Environment(\.dismiss) var dismiss
-    @State private var selectedColor: PieceColor = .white
-    @State private var timerMode: TimerMode = .noLimit
-    @State private var timePerMove: Double = 30
-    @State private var showBoardPicker = false
     @State private var selectedBoardStyle = UserDefaultsManager.shared.getSelectedBoardStyle()
+    @State private var timePerMove: Double = 0
+    @State private var showBoardStylePicker = false
     @Binding var showGame: Bool
     @Binding var gameSettings: GameSettings?
     
+    private let boardStyles = [
+        (name: "Classic Brown", colors: (Color(red: 0.6, green: 0.4, blue: 0.2), Color(red: 0.9, green: 0.7, blue: 0.5))),
+        (name: "Modern Gray", colors: (Color(red: 0.3, green: 0.3, blue: 0.3), Color(red: 0.8, green: 0.8, blue: 0.8))),
+        (name: "Elegant Blue", colors: (Color(red: 0.2, green: 0.4, blue: 0.8), Color(red: 0.6, green: 0.8, blue: 1.0))),
+        (name: "Vintage Green", colors: (Color(red: 0.2, green: 0.6, blue: 0.3), Color(red: 0.6, green: 0.9, blue: 0.5))),
+        (name: "Royal Purple", colors: (Color(red: 0.4, green: 0.2, blue: 0.6), Color(red: 0.7, green: 0.5, blue: 0.9))),
+        (name: "Sunset Orange", colors: (Color(red: 0.8, green: 0.4, blue: 0.2), Color(red: 1.0, green: 0.7, blue: 0.5))),
+        (name: "Cherry Red", colors: (Color(red: 0.7, green: 0.2, blue: 0.2), Color(red: 0.9, green: 0.5, blue: 0.5))),
+        (name: "Mint Green", colors: (Color(red: 0.2, green: 0.7, blue: 0.5), Color(red: 0.5, green: 0.9, blue: 0.7)))
+    ]
+    
     var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Game Settings")) {
-                    Picker("Your Color", selection: $selectedColor) {
-                        Text("White").tag(PieceColor.white)
-                        Text("Black").tag(PieceColor.black)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    
-                    Picker("Timer", selection: $timerMode) {
-                        Text("No Limit").tag(TimerMode.noLimit)
-                        Text("Time Per Move").tag(TimerMode.timePerMove)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    
-                    if timerMode == .timePerMove {
-                        VStack {
-                            Text("\(Int(timePerMove)) seconds")
-                            Slider(value: $timePerMove, in: 5...60, step: 5)
-                        }
-                    }
-                }
-                
-                Section {
-                    Button(action: {
-                        showBoardPicker = true
-                    }) {
-                        HStack {
+        VStack(spacing: 0) {
+            VStack(spacing: 8) {
+                Text("New Game")
+                    .font(.system(size: 32, weight: .bold))
+                    .foregroundColor(.gray)
+                Text("Customize your game")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.gray.opacity(0.7))
+            }
+            .padding(.top, 40)
+            .padding(.bottom, 40)
+
+            VStack(spacing: 24) {
+                Button(action: {
+                    showBoardStylePicker = true
+                }) {
+                    HStack {
+                        Image(systemName: "square.grid.2x2")
+                            .font(.system(size: 20))
+                            .foregroundColor(.gray)
+                            .frame(width: 30)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
                             Text("Board Style")
-                            Spacer()
-                            Text("Select")
-                                .foregroundColor(.blue)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.gray)
+                            Text(boardStyles[selectedBoardStyle].name)
+                                .font(.system(size: 14))
+                                .foregroundColor(.gray.opacity(0.7))
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.gray.opacity(0.7))
+                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(16)
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "timer")
+                            .font(.system(size: 20))
+                            .foregroundColor(.gray)
+                            .frame(width: 30)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Time per move")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.gray)
+                            Text("\(Int(timePerMove)) seconds")
+                                .font(.system(size: 14))
+                                .foregroundColor(.gray.opacity(0.7))
                         }
                     }
+                    
+                    Slider(value: $timePerMove, in: 0...300, step: 30)
+                        .tint(.gray)
+                        .padding(.leading, 30)
                 }
-                
-                Section {
-                    Button(action: {
-                        gameSettings = GameSettings(
-                            playerColor: selectedColor,
-                            timerMode: timerMode,
-                            timePerMove: timePerMove,
-                            boardStyle: selectedBoardStyle
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(16)
+            }
+            .padding(.horizontal)
+            
+            Spacer()
+
+            Button(action: {
+                gameSettings = GameSettings(
+                    playerColor: .white,
+                    timerMode: timePerMove > 0 ? .timePerMove : .noLimit,
+                    timePerMove: timePerMove,
+                    boardStyle: selectedBoardStyle
+                )
+                showGame = true
+                dismiss()
+            }) {
+                HStack {
+                    Text("Start Game")
+                        .font(.system(size: 18, weight: .semibold))
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [Color.gray, Color.gray.opacity(0.8)]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .cornerRadius(16)
+                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 30)
+        }
+        .sheet(isPresented: $showBoardStylePicker) {
+            BoardStylePickerView(selectedStyle: $selectedBoardStyle)
+        }
+    }
+}
+
+struct BoardStyleCard: View {
+    let style: (name: String, colors: (Color, Color))
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(style.colors.0)
+                        .aspectRatio(1, contentMode: .fit)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(isSelected ? Color.gray : Color.clear, lineWidth: 3)
                         )
-                        showGame = true
-                        dismiss()
-                    }) {
-                        Text("Start Game")
-                            .frame(maxWidth: .infinity)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.blue)
-                            .cornerRadius(10)
+                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                    
+                    VStack(spacing: 0) {
+                        ForEach(0..<4) { row in
+                            HStack(spacing: 0) {
+                                ForEach(0..<4) { col in
+                                    Rectangle()
+                                        .fill((row + col) % 2 == 0 ? style.colors.0 : style.colors.1)
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                }
+                            }
+                        }
+                    }
+                    .padding(12)
+                }
+
+                HStack {
+                    Text(style.name)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    Spacer()
+                    
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.gray)
+                    } else {
+                        Color.clear
+                            .frame(width: 20, height: 20)
                     }
                 }
+                .frame(height: 24)
             }
-            .navigationTitle("New Game")
-            .navigationBarItems(trailing: Button("Cancel") {
-                dismiss()
-            })
-            .sheet(isPresented: $showBoardPicker) {
-                BoardStylePickerView(selectedStyle: $selectedBoardStyle)
-            }
+            .padding(.vertical, 8)
         }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
 struct BoardStylePickerView: View {
     @Environment(\.dismiss) var dismiss
     @Binding var selectedStyle: Int
-    let boardStyles: [(name: String, light: Color, dark: Color)] = [
-        ("Classic Brown", Color.brown.opacity(0.3), Color.brown.opacity(0.7)),
-        ("Forest Green", Color.green.opacity(0.3), Color.green.opacity(0.7)),
-        ("Ocean Blue", Color.blue.opacity(0.3), Color.blue.opacity(0.7)),
-        ("Elegant Gray", Color.gray.opacity(0.3), Color.gray.opacity(0.7)),
-        ("Royal Purple", Color.purple.opacity(0.3), Color.purple.opacity(0.7)),
-        ("Sunset Orange", Color.orange.opacity(0.3), Color.orange.opacity(0.7)),
-        ("Cherry Red", Color.red.opacity(0.3), Color.red.opacity(0.7)),
-        ("Mint Green", Color(red: 0.4, green: 0.8, blue: 0.6).opacity(0.3), Color(red: 0.4, green: 0.8, blue: 0.6).opacity(0.7))
+    
+    private let boardStyles = [
+        (name: "Classic Brown", colors: (Color(red: 0.6, green: 0.4, blue: 0.2), Color(red: 0.9, green: 0.7, blue: 0.5))),
+        (name: "Modern Gray", colors: (Color(red: 0.3, green: 0.3, blue: 0.3), Color(red: 0.8, green: 0.8, blue: 0.8))),
+        (name: "Elegant Blue", colors: (Color(red: 0.2, green: 0.4, blue: 0.8), Color(red: 0.6, green: 0.8, blue: 1.0))),
+        (name: "Vintage Green", colors: (Color(red: 0.2, green: 0.6, blue: 0.3), Color(red: 0.6, green: 0.9, blue: 0.5))),
+        (name: "Royal Purple", colors: (Color(red: 0.4, green: 0.2, blue: 0.6), Color(red: 0.7, green: 0.5, blue: 0.9))),
+        (name: "Sunset Orange", colors: (Color(red: 0.8, green: 0.4, blue: 0.2), Color(red: 1.0, green: 0.7, blue: 0.5))),
+        (name: "Cherry Red", colors: (Color(red: 0.7, green: 0.2, blue: 0.2), Color(red: 0.9, green: 0.5, blue: 0.5))),
+        (name: "Mint Green", colors: (Color(red: 0.2, green: 0.7, blue: 0.5), Color(red: 0.5, green: 0.9, blue: 0.7)))
     ]
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    ForEach(0..<boardStyles.count, id: \.self) { index in
-                        BoardStylePreview(
-                            name: boardStyles[index].name,
-                            lightColor: boardStyles[index].light,
-                            darkColor: boardStyles[index].dark,
-                            isSelected: selectedStyle == index
-                        )
-                        .onTapGesture {
-                            selectedStyle = index
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 24) {
+                    VStack(spacing: 8) {
+                        Text("Choose Board Style")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundColor(.gray)
+                        Text("Select your preferred board design")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.gray.opacity(0.7))
+                    }
+                    .padding(.top, 20)
+                    .padding(.bottom, 20)
+                    
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
+                        ForEach(0..<boardStyles.count, id: \.self) { index in
+                            BoardStyleCard(
+                                style: boardStyles[index],
+                                isSelected: selectedStyle == index,
+                                action: {
+                                    selectedStyle = index
+                                    UserDefaultsManager.shared.saveSelectedBoardStyle(index)
+                                }
+                            )
                         }
                     }
-                }
-                .padding()
-            }
-            .navigationTitle("Board Style")
-            .navigationBarItems(trailing: Button("Done") {
-                UserDefaultsManager.shared.saveSelectedBoardStyle(selectedStyle)
-                dismiss()
-            })
-        }
-    }
-}
-
-struct BoardStylePreview: View {
-    let name: String
-    let lightColor: Color
-    let darkColor: Color
-    let isSelected: Bool
-    
-    var body: some View {
-        VStack {
-            VStack(spacing: 0) {
-                ForEach(0..<8) { row in
-                    HStack(spacing: 0) {
-                        ForEach(0..<8) { col in
-                            Rectangle()
-                                .fill((row + col) % 2 == 0 ? lightColor : darkColor)
-                                .frame(width: 30, height: 30)
-                        }
-                    }
+                    .padding(.horizontal)
                 }
             }
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 3)
+            .navigationBarItems(
+                trailing: Button(action: {
+                    dismiss()
+                }) {
+                    Text("Done")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.gray)
+                }
             )
-            
-            Text(name)
-                .font(.caption)
-                .padding(.top, 8)
         }
-        .padding()
-        .background(isSelected ? Color.blue.opacity(0.1) : Color.clear)
-        .cornerRadius(12)
     }
 }
 
