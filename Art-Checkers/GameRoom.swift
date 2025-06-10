@@ -23,41 +23,63 @@ class GameRoom: NSObject, ObservableObject {
     private func setupSession() {
         session = MCSession(peer: myPeerId, securityIdentity: nil, encryptionPreference: .required)
         session?.delegate = self
-        statusMessage = "Session created"
+        statusMessage = "Ready"
     }
     
     func startHosting(settings: GameSettings) {
+        stopHosting()
+        stopBrowsing()
+
         isHost = true
         gameSettings = settings
+
         advertiser = MCNearbyServiceAdvertiser(peer: myPeerId, discoveryInfo: nil, serviceType: serviceType)
         advertiser?.delegate = self
         advertiser?.startAdvertisingPeer()
-        statusMessage = "Waiting for connection..."
-        print("Started advertising as host")
+        
+        statusMessage = "Room created"
+    }
+    
+    func stopHosting() {
+        advertiser?.stopAdvertisingPeer()
+        advertiser = nil
+        isHost = false
     }
     
     func startBrowsing() {
+        stopHosting()
+        stopBrowsing()
+
         isSearching = true
         browser = MCNearbyServiceBrowser(peer: myPeerId, serviceType: serviceType)
         browser?.delegate = self
         browser?.startBrowsingForPeers()
-        statusMessage = "Searching for rooms..."
-        print("Started browsing for peers")
+        
+        statusMessage = "Searching..."
     }
     
     func stopBrowsing() {
         browser?.stopBrowsingForPeers()
+        browser = nil
         isSearching = false
-        statusMessage = "Search stopped"
     }
     
-    func sendGameSettings(_ settings: GameSettings) {
-        guard let session = session else { return }
+    func disconnect() {
+        stopHosting()
+        stopBrowsing()
+        session?.disconnect()
+        connectedPeers.removeAll()
+        statusMessage = "Disconnected"
+    }
+    
+    private func sendGameSettings() {
+        guard let session = session, let settings = gameSettings else { return }
         let data = try? JSONEncoder().encode(settings)
         try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
     }
 }
 
+// MARK: - MCSessionDelegate
 extension GameRoom: MCSessionDelegate {
     func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
         DispatchQueue.main.async {
@@ -67,7 +89,7 @@ extension GameRoom: MCSessionDelegate {
                     self.connectedPeers.append(peerID)
                     self.statusMessage = "Connected to \(peerID.displayName)"
                     if self.isHost {
-                        self.sendGameSettings(self.gameSettings!)
+                        self.sendGameSettings()
                     }
                 }
             case .notConnected:
@@ -94,6 +116,7 @@ extension GameRoom: MCSessionDelegate {
     func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: Error?) {}
 }
 
+// MARK: - MCNearbyServiceAdvertiserDelegate
 extension GameRoom: MCNearbyServiceAdvertiserDelegate {
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
         DispatchQueue.main.async {
@@ -109,6 +132,7 @@ extension GameRoom: MCNearbyServiceAdvertiserDelegate {
     }
 }
 
+// MARK: - MCNearbyServiceBrowserDelegate
 extension GameRoom: MCNearbyServiceBrowserDelegate {
     func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
         DispatchQueue.main.async {
