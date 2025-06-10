@@ -123,6 +123,11 @@ struct BoardView: View {
                 if let draggedPiece = draggedPiece,
                    let selectedPosition = selectedPosition {
                     PieceView(piece: draggedPiece, size: squareSize * 0.8)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.green, lineWidth: 2)
+                                .frame(width: squareSize * 0.8, height: squareSize * 0.8)
+                        )
                         .position(
                             x: CGFloat(selectedPosition.col) * squareSize + squareSize / 2,
                             y: CGFloat(selectedPosition.row) * squareSize + squareSize / 2
