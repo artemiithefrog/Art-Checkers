@@ -4,8 +4,10 @@
 <dict>
 	<key>NSBonjourServices</key>
 	<array>
-		<string>_counter-game._tcp</string>
-		<string>_counter-game._udp</string>
+		<string>_checkers-game._tcp</string>
+		<string>_checkers-game._udp</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app needs access to the local network to find and connect to other players.</string>
 </dict>
 </plist>
