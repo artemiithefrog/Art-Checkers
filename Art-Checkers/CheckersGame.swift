@@ -282,7 +282,7 @@ class CheckersGame: ObservableObject {
     
     func reset() {
         board = Array(repeating: Array(repeating: nil, count: 8), count: 8)
-
+        
         for row in 0..<3 {
             for col in 0..<8 {
                 if (row + col) % 2 == 1 {
@@ -290,7 +290,7 @@ class CheckersGame: ObservableObject {
                 }
             }
         }
-
+        
         for row in 5..<8 {
             for col in 0..<8 {
                 if (row + col) % 2 == 1 {
@@ -298,9 +298,8 @@ class CheckersGame: ObservableObject {
                 }
             }
         }
-
+        
         currentPlayer = .white
-
         gameOver = false
         winner = nil
         capturedWhitePieces = 0

@@ -344,6 +344,7 @@ struct CheckersBoardView: View {
             Text("Are you sure you want to exit the game?")
         }
         .onAppear {
+            game.reset()
             if settings.timePerMove > 0 {
                 startTimer()
             }
