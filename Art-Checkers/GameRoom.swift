@@ -2,6 +2,8 @@ import Foundation
 import MultipeerConnectivity
 
 class GameRoom: NSObject, ObservableObject {
+    static let shared = GameRoom()
+    
     @Published var isHost: Bool = false
     @Published var connectedPeers: [MCPeerID] = []
     @Published var statusMessage: String = ""
@@ -15,23 +17,34 @@ class GameRoom: NSObject, ObservableObject {
     private let serviceType = "checkers-game"
     private let myPeerId = MCPeerID(displayName: UIDevice.current.name)
     
-    override init() {
+    private override init() {
         super.init()
+        print("🎮 GameRoom: Initializing game room")
         setupSession()
     }
     
     deinit {
-        disconnect()
+        print("🎮 GameRoom: Deinitializing game room")
+        cleanup()
     }
     
     private func setupSession() {
+        print("🎮 GameRoom: Setting up MultipeerConnectivity session")
         session = MCSession(peer: myPeerId, securityIdentity: nil, encryptionPreference: .required)
         session?.delegate = self
         statusMessage = "Ready"
+        print("🎮 GameRoom: Session setup complete")
     }
     
     func startHosting(settings: GameSettings) {
-        disconnect()
+        print("🎮 GameRoom: Starting to host game room")
+        print("🎮 GameRoom: Game settings:")
+        print("  - Player Color: \(settings.playerColor)")
+        print("  - Timer Mode: \(settings.timerMode)")
+        print("  - Time Per Move: \(settings.timePerMove)")
+        print("  - Board Style: \(settings.boardStyle)")
+        
+        cleanup()
         
         isHost = true
         gameSettings = settings
@@ -40,21 +53,25 @@ class GameRoom: NSObject, ObservableObject {
         advertiser?.delegate = self
         advertiser?.startAdvertisingPeer()
         
+        print("🎮 GameRoom: Started advertising peer")
         statusMessage = "Room created"
     }
     
     func startBrowsing() {
-        disconnect()
+        print("🎮 GameRoom: Starting to browse for game rooms")
+        cleanup()
         
         isSearching = true
         browser = MCNearbyServiceBrowser(peer: myPeerId, serviceType: serviceType)
         browser?.delegate = self
         browser?.startBrowsingForPeers()
         
+        print("🎮 GameRoom: Started browsing for peers")
         statusMessage = "Searching..."
     }
     
     func stopBrowsing() {
+        print("🎮 GameRoom: Stopping room search")
         browser?.stopBrowsingForPeers()
         browser = nil
         isSearching = false
@@ -62,7 +79,14 @@ class GameRoom: NSObject, ObservableObject {
     }
     
     func disconnect() {
+        print("🎮 GameRoom: Disconnecting from current session")
+        cleanup()
+        statusMessage = "Disconnected"
+    }
+    
+    private func cleanup() {
         if isHost {
+            print("🎮 GameRoom: Stopping advertising as host")
             advertiser?.stopAdvertisingPeer()
             advertiser = nil
             isHost = false
@@ -74,13 +98,15 @@ class GameRoom: NSObject, ObservableObject {
         
         session?.disconnect()
         connectedPeers.removeAll()
-        statusMessage = "Disconnected"
+        print("🎮 GameRoom: Cleanup complete")
     }
     
     private func sendGameSettings() {
         guard let session = session, let settings = gameSettings else { return }
+        print("🎮 GameRoom: Sending game settings to peers")
         let data = try? JSONEncoder().encode(settings)
         try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
+        print("🎮 GameRoom: Game settings sent successfully")
     }
 }
 
@@ -91,16 +117,20 @@ extension GameRoom: MCSessionDelegate {
             switch state {
             case .connected:
                 if !self.connectedPeers.contains(peerID) {
+                    print("🎮 GameRoom: Peer connected: \(peerID.displayName)")
                     self.connectedPeers.append(peerID)
                     self.statusMessage = "Connected to \(peerID.displayName)"
                     if self.isHost {
+                        print("🎮 GameRoom: Sending game settings to new peer")
                         self.sendGameSettings()
                     }
                 }
             case .notConnected:
+                print("🎮 GameRoom: Peer disconnected: \(peerID.displayName)")
                 self.connectedPeers.removeAll { $0 == peerID }
                 self.statusMessage = "Disconnected from \(peerID.displayName)"
             case .connecting:
+                print("🎮 GameRoom: Connecting to peer: \(peerID.displayName)")
                 self.statusMessage = "Connecting to \(peerID.displayName)..."
             @unknown default:
                 break
@@ -110,6 +140,13 @@ extension GameRoom: MCSessionDelegate {
     
     func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
         if let settings = try? JSONDecoder().decode(GameSettings.self, from: data) {
+            print("🎮 GameRoom: Received game settings from peer: \(peerID.displayName)")
+            print("🎮 GameRoom: Received settings:")
+            print("  - Player Color: \(settings.playerColor)")
+            print("  - Timer Mode: \(settings.timerMode)")
+            print("  - Time Per Move: \(settings.timePerMove)")
+            print("  - Board Style: \(settings.boardStyle)")
+            
             DispatchQueue.main.async {
                 self.gameSettings = settings
             }
@@ -124,6 +161,7 @@ extension GameRoom: MCSessionDelegate {
 // MARK: - MCNearbyServiceAdvertiserDelegate
 extension GameRoom: MCNearbyServiceAdvertiserDelegate {
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
+        print("🎮 GameRoom: Received invitation from peer: \(peerID.displayName)")
         DispatchQueue.main.async {
             self.statusMessage = "Received invitation from \(peerID.displayName)"
         }
@@ -131,6 +169,7 @@ extension GameRoom: MCNearbyServiceAdvertiserDelegate {
     }
     
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
+        print("🎮 GameRoom: Error creating room: \(error.localizedDescription)")
         DispatchQueue.main.async {
             self.statusMessage = "Error creating room: \(error.localizedDescription)"
         }
@@ -140,6 +179,7 @@ extension GameRoom: MCNearbyServiceAdvertiserDelegate {
 // MARK: - MCNearbyServiceBrowserDelegate
 extension GameRoom: MCNearbyServiceBrowserDelegate {
     func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
+        print("🎮 GameRoom: Found room: \(peerID.displayName)")
         DispatchQueue.main.async {
             self.statusMessage = "Found room: \(peerID.displayName)"
             self.isSearching = false
@@ -148,12 +188,14 @@ extension GameRoom: MCNearbyServiceBrowserDelegate {
     }
     
     func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
+        print("🎮 GameRoom: Room unavailable: \(peerID.displayName)")
         DispatchQueue.main.async {
             self.statusMessage = "Room unavailable: \(peerID.displayName)"
         }
     }
     
     func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
+        print("🎮 GameRoom: Error searching for rooms: \(error.localizedDescription)")
         DispatchQueue.main.async {
             self.statusMessage = "Error searching for rooms: \(error.localizedDescription)"
             self.isSearching = false

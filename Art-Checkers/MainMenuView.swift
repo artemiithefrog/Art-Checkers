@@ -5,6 +5,7 @@ struct MainMenuView: View {
     @State private var showAvailableRooms = false
     @Binding var showGame: Bool
     @Binding var gameSettings: GameSettings?
+    @StateObject private var gameRoom = GameRoom.shared
     
     var body: some View {
         NavigationView {
@@ -49,10 +50,10 @@ struct MainMenuView: View {
             }
             .padding()
             .sheet(isPresented: $showNewGameSheet) {
-                NewGameView(showGame: $showGame, gameSettings: $gameSettings)
+                NewGameView(showGame: $showGame, gameSettings: $gameSettings, gameRoom: gameRoom)
             }
             .sheet(isPresented: $showAvailableRooms) {
-                AvailableRoomsView(showGame: $showGame, gameSettings: $gameSettings)
+                AvailableRoomsView(showGame: $showGame, gameSettings: $gameSettings, gameRoom: gameRoom)
             }
         }
     }
@@ -65,7 +66,7 @@ struct NewGameView: View {
     @State private var showBoardStylePicker = false
     @Binding var showGame: Bool
     @Binding var gameSettings: GameSettings?
-    @StateObject private var gameRoom = GameRoom()
+    @ObservedObject var gameRoom: GameRoom
     
     private let boardStyles = [
         (name: "Classic Brown", colors: (Color(red: 0.6, green: 0.4, blue: 0.2), Color(red: 0.9, green: 0.7, blue: 0.5))),
@@ -327,7 +328,7 @@ struct AvailableRoomsView: View {
     @Environment(\.dismiss) var dismiss
     @Binding var showGame: Bool
     @Binding var gameSettings: GameSettings?
-    @StateObject private var gameRoom = GameRoom()
+    @ObservedObject var gameRoom: GameRoom
     @State private var isSearching = false
     @State private var searchStartTime = Date()
     
