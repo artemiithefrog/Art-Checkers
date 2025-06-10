@@ -32,10 +32,23 @@ class GameRoom: NSObject, ObservableObject {
         print("🎮 GameRoom: Starting to host game room")
         isHost = true
         gameSettings = settings
-        advertiser = MCNearbyServiceAdvertiser(peer: myPeerId, discoveryInfo: nil, serviceType: serviceType)
+        
+        guard let session = session else {
+            print("❌ GameRoom: Cannot start hosting - session is nil")
+            return
+        }
+
+        let discoveryInfo = ["gameType": "checkers"]
+        advertiser = MCNearbyServiceAdvertiser(peer: myPeerId, discoveryInfo: discoveryInfo, serviceType: serviceType)
         advertiser?.delegate = self
-        advertiser?.startAdvertisingPeer()
-        print("🎮 GameRoom: Started advertising as host with service type: \(serviceType)")
+
+        guard let advertiser = advertiser else {
+            print("❌ GameRoom: Failed to create advertiser")
+            return
+        }
+        
+        print("🎮 GameRoom: Starting advertising with service type: \(serviceType)")
+        advertiser.startAdvertisingPeer()
         print("🎮 GameRoom: Room is now discoverable by other devices")
         statusMessage = "Waiting for connection..."
     }
@@ -43,10 +56,24 @@ class GameRoom: NSObject, ObservableObject {
     func startBrowsing() {
         print("🎮 GameRoom: Starting to browse for game rooms")
         isSearching = true
+
+        guard let session = session else {
+            print("❌ GameRoom: Cannot start browsing - session is nil")
+            isSearching = false
+            return
+        }
+
         browser = MCNearbyServiceBrowser(peer: myPeerId, serviceType: serviceType)
         browser?.delegate = self
-        browser?.startBrowsingForPeers()
-        print("🎮 GameRoom: Started browsing for peers with service type: \(serviceType)")
+        
+        guard let browser = browser else {
+            print("❌ GameRoom: Failed to create browser")
+            isSearching = false
+            return
+        }
+        
+        print("🎮 GameRoom: Starting browsing with service type: \(serviceType)")
+        browser.startBrowsingForPeers()
         statusMessage = "Searching for rooms..."
     }
     
@@ -146,12 +173,20 @@ extension GameRoom: MCNearbyServiceAdvertiserDelegate {
 extension GameRoom: MCNearbyServiceBrowserDelegate {
     func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
         print("🔍 GameRoom: Found peer: \(peerID.displayName)")
+        print("🔍 GameRoom: Discovery info: \(info ?? [:])")
+        
         DispatchQueue.main.async {
             self.statusMessage = "Found room: \(peerID.displayName)"
             self.isSearching = false
         }
-        browser.invitePeer(peerID, to: session!, withContext: nil, timeout: 30)
-        print("📨 GameRoom: Sent invitation to peer: \(peerID.displayName)")
+
+        guard let session = session else {
+            print("❌ GameRoom: Cannot invite peer - session is nil")
+            return
+        }
+        
+        print("📨 GameRoom: Sending invitation to peer: \(peerID.displayName)")
+        browser.invitePeer(peerID, to: session, withContext: nil, timeout: 30)
     }
     
     func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
