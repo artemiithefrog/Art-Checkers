@@ -32,6 +32,8 @@ class CheckersGame: ObservableObject {
     @Published var lastCapturePosition: Position?
     @Published var gameOver: Bool = false
     @Published var winner: PieceColor?
+    @Published var capturedWhitePieces: Int = 0
+    @Published var capturedBlackPieces: Int = 0
     
     init() {
         setupBoard()
@@ -263,6 +265,13 @@ class CheckersGame: ObservableObject {
             if abs(to.row - from.row) == 2 {
                 let capturedRow = (from.row + to.row) / 2
                 let capturedCol = (from.col + to.col) / 2
+                if let capturedPiece = board[capturedRow][capturedCol] {
+                    if capturedPiece.color == .white {
+                        capturedWhitePieces += 1
+                    } else {
+                        capturedBlackPieces += 1
+                    }
+                }
                 board[capturedRow][capturedCol] = nil
             }
             
@@ -294,6 +303,8 @@ class CheckersGame: ObservableObject {
 
         gameOver = false
         winner = nil
+        capturedWhitePieces = 0
+        capturedBlackPieces = 0
     }
     
     private func checkGameOver() {

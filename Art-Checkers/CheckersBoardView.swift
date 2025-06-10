@@ -55,6 +55,21 @@ struct CheckersBoardView: View {
                 .padding(.horizontal)
 
                 Spacer()
+                
+                HStack(spacing: 20) {
+                    if game.capturedWhitePieces > 0 {
+                        HStack(spacing: -10) {
+                            ForEach(0..<min(game.capturedWhitePieces, 5), id: \.self) { index in
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 30, height: 30)
+                                    .shadow(radius: 2)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 30)
+                .padding(.horizontal)
                  
                 HStack {
                     if settings.timePerMove > 0 {
@@ -72,6 +87,7 @@ struct CheckersBoardView: View {
                     }
                     Spacer()
                 }
+                
                 GeometryReader { geometry in
                     let squareSize = min(geometry.size.width, geometry.size.height) / 8
                     
@@ -269,6 +285,22 @@ struct CheckersBoardView: View {
                     }
                     Spacer()
                 }
+                
+                HStack(spacing: 20) {
+                    if game.capturedBlackPieces > 0 {
+                        HStack(spacing: -10) {
+                            ForEach(0..<min(game.capturedBlackPieces, 5), id: \.self) { index in
+                                Circle()
+                                    .fill(Color.black)
+                                    .frame(width: 30, height: 30)
+                                    .shadow(radius: 2)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 30)
+                .padding(.horizontal)
+                
                 Spacer()
             }
             
