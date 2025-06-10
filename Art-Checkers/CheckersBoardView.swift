@@ -37,22 +37,26 @@ struct CheckersBoardView: View {
                         showExitAlert = true
                     }) {
                         Image(systemName: "chevron.left")
-                            .font(.title2)
-                            .foregroundColor(.blue)
-                            .padding()
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(.gray)
+                            .frame(width: 40, height: 40)
+                            .background(Color.gray.opacity(0.1))
+                            .clipShape(Circle())
                     }
                     
                     Spacer()
                     
                     Text("Current Player: \(game.currentPlayer == .white ? "White" : "Black")")
-                        .font(.title)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.gray)
                     
                     Spacer()
                     
                     Color.clear
-                        .frame(width: 44, height: 44)
+                        .frame(width: 40, height: 40)
                 }
                 .padding(.horizontal)
+                .padding(.vertical, 8)
 
                 Spacer()
                 
