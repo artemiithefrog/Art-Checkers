@@ -10,9 +10,22 @@
 		D158982C2DF8391D008AE98A /* Art-Checkers.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Art-Checkers.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D14F1B9B2DF8BC9400AEB81C /* Exceptions for "Art-Checkers" folder in "Art-Checkers" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D158982B2DF8391D008AE98A /* Art-Checkers */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D158982E2DF8391D008AE98A /* Art-Checkers */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D14F1B9B2DF8BC9400AEB81C /* Exceptions for "Art-Checkers" folder in "Art-Checkers" target */,
+			);
 			path = "Art-Checkers";
 			sourceTree = "<group>";
 		};
@@ -256,6 +269,8 @@
 				DEVELOPMENT_TEAM = KLU4RK8QNS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Art-Checkers/Info.plist";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "This app needs to use the local network to find and connect to other players.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -290,6 +305,8 @@
 				DEVELOPMENT_TEAM = KLU4RK8QNS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Art-Checkers/Info.plist";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "This app needs to use the local network to find and connect to other players.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

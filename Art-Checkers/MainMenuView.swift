@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainMenuView: View {
     @State private var showNewGameSheet = false
+    @State private var showAvailableRooms = false
     @Binding var showGame: Bool
     @Binding var gameSettings: GameSettings?
     
@@ -25,7 +26,7 @@ struct MainMenuView: View {
                 }
                 
                 Button(action: {
-                    // TODO: Show rooms list
+                    showAvailableRooms = true
                 }) {
                     Text("Join Room")
                         .font(.title2)
@@ -49,6 +50,9 @@ struct MainMenuView: View {
             .padding()
             .sheet(isPresented: $showNewGameSheet) {
                 NewGameView(showGame: $showGame, gameSettings: $gameSettings)
+            }
+            .sheet(isPresented: $showAvailableRooms) {
+                AvailableRoomsView(showGame: $showGame, gameSettings: $gameSettings)
             }
         }
     }
@@ -297,9 +301,110 @@ struct BoardStylePickerView: View {
     }
 }
 
-enum TimerMode {
-    case noLimit
-    case timePerMove
+struct AvailableRoomsView: View {
+    @Environment(\.dismiss) var dismiss
+    @Binding var showGame: Bool
+    @Binding var gameSettings: GameSettings?
+    @StateObject private var gameRoom = GameRoom()
+    @State private var isSearching = false
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                VStack(spacing: 8) {
+                    Text("Available Rooms")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundColor(.gray)
+                    Text("Select a room to join")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.gray.opacity(0.7))
+                }
+                .padding(.top, 40)
+                .padding(.bottom, 40)
+                
+                if isSearching {
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Searching for rooms...")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.gray)
+                    }
+                    .frame(maxHeight: .infinity)
+                } else if gameRoom.connectedPeers.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "wifi.slash")
+                            .font(.system(size: 50))
+                            .foregroundColor(.gray)
+                        Text("No rooms available")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.gray)
+                        Button(action: {
+                            isSearching = true
+                            gameRoom.startBrowsing()
+                        }) {
+                            Text("Search Again")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .cornerRadius(8)
+                        }
+                    }
+                    .frame(maxHeight: .infinity)
+                } else {
+                    List {
+                        ForEach(gameRoom.connectedPeers, id: \.self) { peer in
+                            Button(action: {
+                                if let settings = gameRoom.gameSettings {
+                                    gameSettings = settings
+                                    showGame = true
+                                    dismiss()
+                                }
+                            }) {
+                                HStack {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(.gray)
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(peer.displayName)
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(.gray)
+                                        Text("Tap to join")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.gray.opacity(0.7))
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.gray.opacity(0.7))
+                                }
+                                .padding(.vertical, 8)
+                            }
+                        }
+                    }
+                    .listStyle(PlainListStyle())
+                }
+            }
+            .navigationBarItems(
+                trailing: Button(action: {
+                    dismiss()
+                }) {
+                    Text("Done")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.gray)
+                }
+            )
+        }
+        .onAppear {
+            isSearching = true
+            gameRoom.startBrowsing()
+        }
+    }
 }
 
 struct MainMenuView_Previews: PreviewProvider {

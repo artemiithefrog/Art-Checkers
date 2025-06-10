@@ -1,6 +1,6 @@
 import Foundation
 
-enum PieceColor {
+enum PieceColor: String, Codable {
     case white
     case black
 }
