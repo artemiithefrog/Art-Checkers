@@ -7,6 +7,7 @@ struct MainMenuView: View {
     @Binding var showGame: Bool
     @Binding var gameSettings: GameSettings?
     @State private var showGameView = false
+    @State private var showConnectView = false
     @State private var selectedPosition: Position?
     @State private var draggedPiece: Piece?
     @State private var dragOffset: CGSize = .zero
@@ -73,7 +74,7 @@ struct MainMenuView: View {
                             .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
                     }
                     .padding(.bottom, 60)
-
+                    
                     VStack(spacing: 20) {
                         MenuButton(
                             title: "New Game",
@@ -88,7 +89,7 @@ struct MainMenuView: View {
                             icon: "link.circle.fill",
                             color: Color(red: 0.3, green: 0.8, blue: 0.6)
                         ) {
-                            gameRoom.startBrowsing()
+                            showConnectView = true
                         }
                     }
                     .padding(.horizontal, 30)
@@ -103,15 +104,10 @@ struct MainMenuView: View {
             .sheet(isPresented: $showSettingsSheet) {
                 SettingsView()
             }
-            .onChange(of: gameRoom.connectedPeers.isEmpty) { isEmpty in
-                if !isEmpty {
-                    showGameView = true
-                }
-            }
-            .onChange(of: gameRoom.currentSettings) { newSettings in
-                if let settings = newSettings {
-                    gameSettings = settings
-                }
+            .navigationDestination(isPresented: $showConnectView) {
+                ConnectToRoomView(showGame: $showGameView)
+                    .navigationBarBackButtonHidden()
+                    .environmentObject(gameRoom)
             }
             .navigationDestination(isPresented: $showGameView) {
                 CheckersBoardView(
@@ -441,6 +437,190 @@ struct BoardStylePickerView: View {
                 }
             )
         }
+    }
+}
+
+struct ConnectToRoomView: View {
+    @EnvironmentObject var gameRoom: GameRoom
+    @Environment(\.dismiss) var dismiss
+    @Binding var showGame: Bool
+    @State private var isSearching = false
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Button {
+                    gameRoom.cleanup()
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(.gray)
+                        .frame(width: 40, height: 40)
+                        .background(Color.gray.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                
+                Spacer()
+                
+                Text("Available Rooms")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.gray)
+                
+                Spacer()
+                
+                Button {
+                    isSearching = true
+                    gameRoom.startBrowsing()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(.gray)
+                        .frame(width: 40, height: 40)
+                        .background(Color.gray.opacity(0.1))
+                        .clipShape(Circle())
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top)
+            
+            // Room list
+            if isSearching && gameRoom.availablePeers.isEmpty {
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.gray)
+                    
+                    Text("Searching for rooms...")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.gray)
+                }
+                .frame(maxHeight: .infinity)
+            } else if gameRoom.availablePeers.isEmpty {
+                VStack(spacing: 20) {
+                    Image(systemName: "network.slash")
+                        .font(.system(size: 50))
+                        .foregroundColor(.gray.opacity(0.5))
+                    
+                    Text("No rooms available")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    Button {
+                        isSearching = true
+                        gameRoom.startBrowsing()
+                    } label: {
+                        Text("Refresh")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        Color(red: 0.3, green: 0.8, blue: 0.6),
+                                        Color(red: 0.3, green: 0.8, blue: 0.6).opacity(0.8)
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+                .frame(maxHeight: .infinity)
+            } else {
+                VStack(spacing: 16) {
+                    // Random connect button
+                    Button {
+                        gameRoom.connectToRandomRoom()
+                    } label: {
+                        HStack {
+                            Image(systemName: "dice.fill")
+                                .font(.system(size: 18))
+                            Text("Connect to Random Room")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(red: 0.4, green: 0.6, blue: 0.9),
+                                    Color(red: 0.4, green: 0.6, blue: 0.9).opacity(0.8)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .padding(.top, 8)
+                    
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(gameRoom.availablePeers, id: \.self) { peer in
+                                RoomCell(peer: peer.displayName) {
+                                    gameRoom.connectToPeer(peer)
+                                }
+                            }
+                        }
+                        .padding()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            isSearching = true
+            gameRoom.startBrowsing()
+        }
+        .onDisappear {
+            if !showGame {
+                gameRoom.cleanup()
+            }
+        }
+        .onChange(of: gameRoom.availablePeers) { peers in
+            if !peers.isEmpty {
+                isSearching = false
+            }
+        }
+        .onChange(of: gameRoom.connectedPeers.isEmpty) { isEmpty in
+            if !isEmpty {
+                showGame = true
+            }
+        }
+    }
+}
+
+struct RoomCell: View {
+    let peer: String
+    let onConnect: () -> Void
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(peer)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(.gray)
+                
+                Text("Tap to connect")
+                    .font(.system(size: 14))
+                    .foregroundColor(.gray.opacity(0.7))
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.gray.opacity(0.7))
+        }
+        .padding()
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .onTapGesture(perform: onConnect)
     }
 }
 

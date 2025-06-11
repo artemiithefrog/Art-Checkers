@@ -14,6 +14,7 @@ class GameRoom: NSObject, ObservableObject {
     @Published var currentPlayer = "White"
     @Published var isHost: Bool = false
     @Published var connectedPeers: [MCPeerID] = []
+    @Published var availablePeers: [MCPeerID] = []
     @Published var statusMessage: String = ""
     @Published var boardState: [[String]] = Array(repeating: Array(repeating: ".", count: 8), count: 8)
     @Published var initialBoard: [[Piece?]]?
@@ -71,7 +72,62 @@ class GameRoom: NSObject, ObservableObject {
         }
     }
     
+    func connectToPeer(_ peer: MCPeerID) {
+        print("GameRoom: Отправка приглашения к \(peer.displayName)")
+        session?.nearbyConnectionData(forPeer: peer) { [weak self] connectionData, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("GameRoom: Ошибка получения данных подключения: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let connectionData = connectionData else {
+                print("GameRoom: Нет данных подключения")
+                return
+            }
+            
+            print("GameRoom: Подключение к \(peer.displayName)...")
+            
+            // Добавляем задержку перед подключением
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.session?.connectPeer(peer, withNearbyConnectionData: connectionData)
+            }
+        }
+    }
+    
+    func cleanup() {
+        print("GameRoom: Очистка состояния")
+        
+        // Сначала отключаем все пиры
+        for peer in connectedPeers {
+            session?.cancelConnectPeer(peer)
+        }
+        
+        // Останавливаем рекламу и браузер
+        advertiser?.stopAdvertisingPeer()
+        browser?.stopBrowsingForPeers()
+        
+        // Очищаем списки
+        connectedPeers.removeAll()
+        availablePeers.removeAll()
+        
+        // Сбрасываем состояние
+        isHost = false
+        currentSettings = nil
+        
+        // Пересоздаем сессию
+        session = MCSession(peer: myPeerId, securityIdentity: nil, encryptionPreference: .required)
+        session?.delegate = self
+        
+        // Добавляем задержку перед перезапуском
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            print("GameRoom: Сессия создана для \(self.myPeerId.displayName)")
+        }
+    }
+    
     func startHosting(settings: GameSettings) {
+        cleanup() // Очищаем предыдущее состояние
         isHost = true
         advertiser = MCNearbyServiceAdvertiser(peer: myPeerId, discoveryInfo: nil, serviceType: serviceType)
         advertiser?.delegate = self
@@ -80,7 +136,6 @@ class GameRoom: NSObject, ObservableObject {
         print("GameRoom: Начало создания комнаты как хост")
         print("GameRoom: Рекламирую сервис типа: \(serviceType)")
         
-        // Сохраняем настройки
         currentSettings = settings
         
         // Отправляем настройки при подключении
@@ -90,6 +145,7 @@ class GameRoom: NSObject, ObservableObject {
     }
     
     func startBrowsing() {
+        cleanup() // Очищаем предыдущее состояние
         browser = MCNearbyServiceBrowser(peer: myPeerId, serviceType: serviceType)
         browser?.delegate = self
         browser?.startBrowsingForPeers()
@@ -163,30 +219,56 @@ class GameRoom: NSObject, ObservableObject {
         try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
         print("GameRoom: Отправлено обновление цвета: \(currentPlayer)")
     }
+    
+    func connect(to peer: MCPeerID) {
+        guard let session = session else { return }
+        browser?.invitePeer(peer, to: session, withContext: nil, timeout: 30)
+        statusMessage = "Подключение к \(peer.displayName)..."
+        print("GameRoom: Отправка приглашения к \(peer.displayName)")
+    }
+    
+    func connectToRandomRoom() {
+        guard let randomPeer = availablePeers.randomElement() else {
+            print("GameRoom: Нет доступных комнат для подключения")
+            return
+        }
+        
+        guard let session = session else {
+            print("GameRoom: Сессия не инициализирована")
+            return
+        }
+        
+        print("GameRoom: Подключение к случайной комнате: \(randomPeer.displayName)")
+        browser?.invitePeer(randomPeer, to: session, withContext: nil, timeout: 30)
+    }
 }
 
 extension GameRoom: MCSessionDelegate {
     func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
             switch state {
             case .connected:
+                print("GameRoom: Успешное подключение к \(peerID.displayName)")
                 if !self.connectedPeers.contains(peerID) {
                     self.connectedPeers.append(peerID)
-                    self.statusMessage = "Подключено к \(peerID.displayName)"
-                    print("GameRoom: Успешное подключение к \(peerID.displayName)")
-                    
-                    // Отправляем настройки при подключении
-                    if self.isHost, let settings = self.currentSettings {
-                        self.sendGameSettings(settings)
-                    }
                 }
-            case .notConnected:
-                self.connectedPeers.removeAll { $0 == peerID }
-                self.statusMessage = "Отключено от \(peerID.displayName)"
-                print("GameRoom: Отключено от \(peerID.displayName)")
+                if self.availablePeers.contains(peerID) {
+                    self.availablePeers.removeAll { $0 == peerID }
+                }
+                
             case .connecting:
-                self.statusMessage = "Подключение к \(peerID.displayName)..."
                 print("GameRoom: Подключение к \(peerID.displayName)...")
+                
+            case .notConnected:
+                print("GameRoom: Отключено от \(peerID.displayName)")
+                self.connectedPeers.removeAll { $0 == peerID }
+                
+                // Если мы не хост и отключились, пробуем переподключиться
+                if !self.isHost && !self.availablePeers.contains(peerID) {
+                    self.availablePeers.append(peerID)
+                }
             @unknown default:
                 break
             }
@@ -249,43 +331,29 @@ extension GameRoom: MCSessionDelegate {
 
 extension GameRoom: MCNearbyServiceAdvertiserDelegate {
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
-        DispatchQueue.main.async {
-            self.statusMessage = "Получено приглашение от \(peerID.displayName)"
-            print("GameRoom: Получено приглашение от \(peerID.displayName)")
-            print("GameRoom: Принимаю приглашение от \(peerID.displayName)")
-        }
+        print("GameRoom: Получено приглашение от \(peerID.displayName)")
         invitationHandler(true, session)
     }
     
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
-        DispatchQueue.main.async {
-            self.statusMessage = "Ошибка создания комнаты: \(error.localizedDescription)"
-            print("GameRoom: Ошибка создания комнаты - \(error.localizedDescription)")
-        }
+        print("GameRoom: Ошибка создания комнаты: \(error.localizedDescription)")
     }
 }
 
 extension GameRoom: MCNearbyServiceBrowserDelegate {
     func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
-        DispatchQueue.main.async {
-            self.statusMessage = "Найдена комната: \(peerID.displayName)"
-            print("GameRoom: Найдена комната - \(peerID.displayName)")
-            print("GameRoom: Отправляю приглашение \(peerID.displayName)")
+        print("GameRoom: Найдена комната: \(peerID.displayName)")
+        if !availablePeers.contains(peerID) {
+            availablePeers.append(peerID)
         }
-        browser.invitePeer(peerID, to: session!, withContext: nil, timeout: 30)
     }
     
     func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
-        DispatchQueue.main.async {
-            self.statusMessage = "Комната недоступна: \(peerID.displayName)"
-            print("GameRoom: Комната стала недоступна - \(peerID.displayName)")
-        }
+        print("GameRoom: Потеряна комната: \(peerID.displayName)")
+        availablePeers.removeAll { $0 == peerID }
     }
     
     func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
-        DispatchQueue.main.async {
-            self.statusMessage = "Ошибка поиска комнат: \(error.localizedDescription)"
-            print("GameRoom: Ошибка поиска комнат - \(error.localizedDescription)")
-        }
+        print("GameRoom: Ошибка поиска комнат: \(error.localizedDescription)")
     }
 }
