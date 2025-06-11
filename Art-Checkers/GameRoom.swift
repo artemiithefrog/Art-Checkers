@@ -19,11 +19,20 @@ class GameRoom: NSObject, ObservableObject {
     @Published var initialBoard: [[Piece?]]?
     @Published var capturedWhitePieces: Int = 0
     @Published var capturedBlackPieces: Int = 0
+    @Published var currentSettings: GameSettings?
     
     private struct BoardStateData: Codable {
         let boardState: [[String]]
         let capturedWhite: Int
         let capturedBlack: Int
+    }
+    
+    private struct GameSettingsData: Codable {
+        let playerColor: String
+        let timerMode: String
+        let timePerMove: Int
+        let initialWhiteTime: Int
+        let initialBlackTime: Int
     }
     
     private var session: MCSession?
@@ -62,7 +71,7 @@ class GameRoom: NSObject, ObservableObject {
         }
     }
     
-    func startHosting() {
+    func startHosting(settings: GameSettings) {
         isHost = true
         advertiser = MCNearbyServiceAdvertiser(peer: myPeerId, discoveryInfo: nil, serviceType: serviceType)
         advertiser?.delegate = self
@@ -70,6 +79,14 @@ class GameRoom: NSObject, ObservableObject {
         statusMessage = "Ожидание подключения..."
         print("GameRoom: Начало создания комнаты как хост")
         print("GameRoom: Рекламирую сервис типа: \(serviceType)")
+        
+        // Сохраняем настройки
+        currentSettings = settings
+        
+        // Отправляем настройки при подключении
+        if let peer = connectedPeers.first {
+            sendGameSettings(settings)
+        }
     }
     
     func startBrowsing() {
@@ -86,6 +103,20 @@ class GameRoom: NSObject, ObservableObject {
         let boardData = try? JSONEncoder().encode(["initialBoard": board])
         try? session.send(boardData ?? Data(), toPeers: session.connectedPeers, with: .reliable)
         print("GameRoom: Отправлено начальное положение шашек")
+    }
+    
+    func sendGameSettings(_ settings: GameSettings) {
+        guard let session = session else { return }
+        let settingsData = GameSettingsData(
+            playerColor: settings.playerColor == .white ? "White" : "Black",
+            timerMode: settings.timerMode.rawValue,
+            timePerMove: Int(settings.timePerMove),
+            initialWhiteTime: Int(settings.timePerMove),
+            initialBlackTime: Int(settings.timePerMove)
+        )
+        let data = try? JSONEncoder().encode(["gameSettings": settingsData])
+        try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
+        print("GameRoom: Отправлены настройки игры")
     }
     
     func sendBoardState(_ board: [[Piece?]]) {
@@ -142,6 +173,11 @@ extension GameRoom: MCSessionDelegate {
                     self.connectedPeers.append(peerID)
                     self.statusMessage = "Подключено к \(peerID.displayName)"
                     print("GameRoom: Успешное подключение к \(peerID.displayName)")
+                    
+                    // Отправляем настройки при подключении
+                    if self.isHost, let settings = self.currentSettings {
+                        self.sendGameSettings(settings)
+                    }
                 }
             case .notConnected:
                 self.connectedPeers.removeAll { $0 == peerID }
@@ -179,6 +215,28 @@ extension GameRoom: MCSessionDelegate {
             DispatchQueue.main.async {
                 self.initialBoard = board
                 print("GameRoom: Получено начальное положение шашек от \(peerID.displayName)")
+            }
+        } else if let settingsData = try? JSONDecoder().decode([String: GameSettingsData].self, from: data),
+                  let settings = settingsData["gameSettings"] {
+            DispatchQueue.main.async {
+                let gameSettings = GameSettings(
+                    playerColor: settings.playerColor == "White" ? .white : .black,
+                    timerMode: TimerMode(rawValue: settings.timerMode) ?? .noLimit,
+                    timePerMove: Double(settings.timePerMove),
+                    boardStyle: UserDefaultsManager.shared.getSelectedBoardStyle()
+                )
+                self.currentSettings = gameSettings
+                
+                // Создаем словарь с начальными значениями таймеров
+                let timerValues = [
+                    "initialWhiteTime": settings.initialWhiteTime,
+                    "initialBlackTime": settings.initialBlackTime
+                ]
+                
+                NotificationCenter.default.post(name: NSNotification.Name("GameSettingsReceived"), object: gameSettings)
+                NotificationCenter.default.post(name: NSNotification.Name("TimerValuesReceived"), object: timerValues)
+                
+                print("GameRoom: Получены настройки игры от \(peerID.displayName)")
             }
         }
     }

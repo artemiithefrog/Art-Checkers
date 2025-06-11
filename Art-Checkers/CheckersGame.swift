@@ -1,6 +1,6 @@
 import Foundation
 
-enum PieceColor: String, Codable {
+enum PieceColor: String, Codable, Equatable {
     case white
     case black
 }
@@ -257,36 +257,50 @@ class CheckersGame: ObservableObject {
     }
     
     func makeMove(from: Position, to: Position) {
-        if isValidMove(from: from, to: to) {
-            board[to.row][to.col] = board[from.row][from.col]
-            board[from.row][from.col] = nil
-
-            if to.row == 0 && board[to.row][to.col]?.color == .white {
-                board[to.row][to.col]?.isKing = true
-            } else if to.row == 7 && board[to.row][to.col]?.color == .black {
-                board[to.row][to.col]?.isKing = true
-            }
+        guard let piece = board[from.row][from.col] else { return }
+        
+        let rowDiff = to.row - from.row
+        let colDiff = abs(to.col - from.col)
+        
+        if abs(rowDiff) == 2 && abs(colDiff) == 2 {
+            let capturedRow = (from.row + to.row) / 2
+            let capturedCol = (from.col + to.col) / 2
             
-            if abs(to.row - from.row) == 2 {
-                let capturedRow = (from.row + to.row) / 2
-                let capturedCol = (from.col + to.col) / 2
-                if let capturedPiece = board[capturedRow][capturedCol] {
-                    if capturedPiece.color == .white {
-                        gameRoom?.capturedWhitePieces += 1
-                        capturedWhitePieces = gameRoom?.capturedWhitePieces ?? 0
-                    } else {
-                        gameRoom?.capturedBlackPieces += 1
-                        capturedBlackPieces = gameRoom?.capturedBlackPieces ?? 0
-                    }
-                }
+            if let capturedPiece = board[capturedRow][capturedCol] {
                 board[capturedRow][capturedCol] = nil
+                if capturedPiece.color == .white {
+                    capturedWhitePieces += 1
+                } else {
+                    capturedBlackPieces += 1
+                }
             }
             
-            currentPlayer = currentPlayer == .white ? .black : .white
-            gameRoom?.playerChanged(currentPlayer: currentPlayer == .white ? "White" : "Black")
-            gameRoom?.sendBoardState(board)
-            checkGameOver()
+            lastCapturePosition = to
+        } else {
+            lastCapturePosition = nil
         }
+        
+        var updatedPiece = piece
+        updatedPiece.position = to
+        
+        if (piece.color == .white && to.row == 0) || (piece.color == .black && to.row == 7) {
+            updatedPiece.type = .king
+            updatedPiece.isKing = true
+        }
+        
+        board[to.row][to.col] = updatedPiece
+        board[from.row][from.col] = nil
+        
+        if lastCapturePosition == nil {
+            currentPlayer = currentPlayer == .white ? .black : .white
+        }
+        
+        if let gameRoom = gameRoom {
+            gameRoom.sendBoardState(board)
+            gameRoom.playerChanged(currentPlayer: currentPlayer == .white ? "White" : "Black")
+        }
+        
+        checkGameOver()
     }
     
     func reset() {

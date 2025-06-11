@@ -111,6 +111,13 @@ struct CheckersBoardView: View {
         self.gameRoom = gameRoom
     }
     
+    private func setInitialTimerValues() {
+        if settings.timePerMove > 0 {
+            whiteTimeRemaining = Int(settings.timePerMove)
+            blackTimeRemaining = Int(settings.timePerMove)
+        }
+    }
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -172,7 +179,7 @@ struct CheckersBoardView: View {
                     HStack {
                         if settings.timePerMove > 0 {
                             HStack {
-                                Text("\(formatTime(blackTimeRemaining))")
+                                Text("\(formatTime(gameRoom.isHost ? blackTimeRemaining : whiteTimeRemaining))")
                                     .font(.system(.title2, design: .monospaced))
                                     .foregroundColor(.white)
                                     .padding(8)
@@ -384,7 +391,7 @@ struct CheckersBoardView: View {
                     HStack {
                         if settings.timePerMove > 0 {
                             HStack {
-                                Text("\(formatTime(whiteTimeRemaining))")
+                                Text("\(formatTime(gameRoom.isHost ? whiteTimeRemaining : blackTimeRemaining))")
                                     .font(.system(.title2, design: .monospaced))
                                     .foregroundColor(.white)
                                     .padding(8)
@@ -441,14 +448,22 @@ struct CheckersBoardView: View {
                 Text("Are you sure you want to exit the game?")
             }
             .onAppear {
-                game.reset()
-                if settings.timePerMove > 0 {
-                    startTimer()
+                game.gameRoom = gameRoom
+                if !gameRoom.isHost {
+                    game.currentPlayer = .black
                 }
                 
-                if !gameRoom.isHost {
-                    if let initialBoard = gameRoom.initialBoard {
-                        game.board = initialBoard
+                setInitialTimerValues()
+                
+                NotificationCenter.default.addObserver(forName: NSNotification.Name("TimerValuesReceived"), object: nil, queue: .main) { notification in
+                    if let timerValues = notification.object as? [String: Int],
+                       let initialWhiteTime = timerValues["initialWhiteTime"],
+                       let initialBlackTime = timerValues["initialBlackTime"] {
+                        whiteTimeRemaining = initialWhiteTime
+                        blackTimeRemaining = initialBlackTime
+                        if settings.timePerMove > 0 {
+                            startTimer()
+                        }
                     }
                 }
             }
@@ -472,6 +487,7 @@ struct CheckersBoardView: View {
             .onDisappear {
                 timer?.invalidate()
                 timer = nil
+                NotificationCenter.default.removeObserver(self)
             }
         }
     }
@@ -513,6 +529,7 @@ struct CheckersBoardView: View {
             if game.currentPlayer == .white {
                 if whiteTimeRemaining > 0 {
                     whiteTimeRemaining -= 1
+                    blackTimeRemaining = Int(settings.timePerMove)
                 } else {
                     timer?.invalidate()
                     game.gameOver = true
@@ -521,6 +538,7 @@ struct CheckersBoardView: View {
             } else {
                 if blackTimeRemaining > 0 {
                     blackTimeRemaining -= 1
+                    whiteTimeRemaining = Int(settings.timePerMove)
                 } else {
                     timer?.invalidate()
                     game.gameOver = true
@@ -531,10 +549,15 @@ struct CheckersBoardView: View {
     }
     
     private func resetTimers() {
-        whiteTimeRemaining = Int(settings.timePerMove)
-        blackTimeRemaining = Int(settings.timePerMove)
-        isFirstMove = false
-        startTimer()
+        if settings.timePerMove > 0 {
+            if game.currentPlayer == .white {
+                blackTimeRemaining = Int(settings.timePerMove)
+            } else {
+                whiteTimeRemaining = Int(settings.timePerMove)
+            }
+            isFirstMove = false
+            startTimer()
+        }
     }
 }
 

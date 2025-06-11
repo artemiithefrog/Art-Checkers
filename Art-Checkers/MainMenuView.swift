@@ -67,6 +67,11 @@ struct MainMenuView: View {
                     showGameView = true
                 }
             }
+            .onChange(of: gameRoom.currentSettings) { newSettings in
+                if let settings = newSettings {
+                    gameSettings = settings
+                }
+            }
             .navigationDestination(isPresented: $showGameView) {
                 CheckersBoardView(
                     game: game,
@@ -74,9 +79,9 @@ struct MainMenuView: View {
                     draggedPiece: $draggedPiece,
                     dragOffset: $dragOffset,
                     settings: GameSettings(
-                        playerColor: .black,
-                        timerMode: .noLimit,
-                        timePerMove: 0,
+                        playerColor: gameRoom.isHost ? .white : .black,
+                        timerMode: gameRoom.currentSettings?.timerMode ?? .noLimit,
+                        timePerMove: gameRoom.currentSettings?.timePerMove ?? 0,
                         boardStyle: UserDefaultsManager.shared.getSelectedBoardStyle()
                     ),
                     showGame: $showGameView,
@@ -84,6 +89,9 @@ struct MainMenuView: View {
                 )
                 .onAppear {
                     game.gameRoom = gameRoom
+                    if !gameRoom.isHost {
+                        game.currentPlayer = .black
+                    }
                 }
                 .navigationBarBackButtonHidden()
             }
@@ -150,7 +158,7 @@ struct NewGameView: View {
                 )
                 
                 gameSettings = settings
-                gameRoom.startHosting()
+                gameRoom.startHosting(settings: settings)
                 showGame = true
                 dismiss()
             }) {
