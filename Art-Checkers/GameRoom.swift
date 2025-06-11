@@ -41,9 +41,10 @@ class GameRoom: NSObject, ObservableObject {
     private var browser: MCNearbyServiceBrowser?
     
     private let serviceType = "checkers-game"
-    private let myPeerId = MCPeerID(displayName: UIDevice.current.name)
+    private let peerID: MCPeerID
     
     override init() {
+        peerID = MCPeerID(displayName: UIDevice.current.name)
         super.init()
         print("GameRoom: Инициализация GameRoom")
         setupSession()
@@ -51,10 +52,10 @@ class GameRoom: NSObject, ObservableObject {
     }
     
     private func setupSession() {
-        session = MCSession(peer: myPeerId, securityIdentity: nil, encryptionPreference: .required)
+        session = MCSession(peer: peerID, securityIdentity: nil, encryptionPreference: .required)
         session?.delegate = self
         statusMessage = "Сессия создана"
-        print("GameRoom: Сессия создана для \(myPeerId.displayName)")
+        print("GameRoom: Сессия создана для \(peerID.displayName)")
     }
     
     private func setupInitialBoardState() {
@@ -68,30 +69,6 @@ class GameRoom: NSObject, ObservableObject {
                         boardState[row][col] = "W" // Белые шашки вверху
                     }
                 }
-            }
-        }
-    }
-    
-    func connectToPeer(_ peer: MCPeerID) {
-        print("GameRoom: Отправка приглашения к \(peer.displayName)")
-        session?.nearbyConnectionData(forPeer: peer) { [weak self] connectionData, error in
-            guard let self = self else { return }
-            
-            if let error = error {
-                print("GameRoom: Ошибка получения данных подключения: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let connectionData = connectionData else {
-                print("GameRoom: Нет данных подключения")
-                return
-            }
-            
-            print("GameRoom: Подключение к \(peer.displayName)...")
-            
-            // Добавляем задержку перед подключением
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.session?.connectPeer(peer, withNearbyConnectionData: connectionData)
             }
         }
     }
@@ -117,24 +94,16 @@ class GameRoom: NSObject, ObservableObject {
         currentSettings = nil
         
         // Пересоздаем сессию
-        session = MCSession(peer: myPeerId, securityIdentity: nil, encryptionPreference: .required)
-        session?.delegate = self
-        
-        // Добавляем задержку перед перезапуском
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            print("GameRoom: Сессия создана для \(self.myPeerId.displayName)")
-        }
+        setupSession()
     }
     
     func startHosting(settings: GameSettings) {
-        cleanup() // Очищаем предыдущее состояние
+        cleanup()
+        
         isHost = true
-        advertiser = MCNearbyServiceAdvertiser(peer: myPeerId, discoveryInfo: nil, serviceType: serviceType)
+        advertiser = MCNearbyServiceAdvertiser(peer: peerID, discoveryInfo: nil, serviceType: serviceType)
         advertiser?.delegate = self
         advertiser?.startAdvertisingPeer()
-        statusMessage = "Ожидание подключения..."
-        print("GameRoom: Начало создания комнаты как хост")
-        print("GameRoom: Рекламирую сервис типа: \(serviceType)")
         
         currentSettings = settings
         
@@ -145,8 +114,10 @@ class GameRoom: NSObject, ObservableObject {
     }
     
     func startBrowsing() {
-        cleanup() // Очищаем предыдущее состояние
-        browser = MCNearbyServiceBrowser(peer: myPeerId, serviceType: serviceType)
+        cleanup()
+        
+        print("GameRoom: Начало поиска комнат")
+        browser = MCNearbyServiceBrowser(peer: peerID, serviceType: serviceType)
         browser?.delegate = self
         browser?.startBrowsingForPeers()
         statusMessage = "Поиск комнат..."
@@ -220,11 +191,9 @@ class GameRoom: NSObject, ObservableObject {
         print("GameRoom: Отправлено обновление цвета: \(currentPlayer)")
     }
     
-    func connect(to peer: MCPeerID) {
-        guard let session = session else { return }
-        browser?.invitePeer(peer, to: session, withContext: nil, timeout: 30)
-        statusMessage = "Подключение к \(peer.displayName)..."
+    func connectToPeer(_ peer: MCPeerID) {
         print("GameRoom: Отправка приглашения к \(peer.displayName)")
+        browser?.invitePeer(peer, to: session!, withContext: nil, timeout: 30)
     }
     
     func connectToRandomRoom() {
@@ -233,13 +202,8 @@ class GameRoom: NSObject, ObservableObject {
             return
         }
         
-        guard let session = session else {
-            print("GameRoom: Сессия не инициализирована")
-            return
-        }
-        
         print("GameRoom: Подключение к случайной комнате: \(randomPeer.displayName)")
-        browser?.invitePeer(randomPeer, to: session, withContext: nil, timeout: 30)
+        browser?.invitePeer(randomPeer, to: session!, withContext: nil, timeout: 30)
     }
 }
 
@@ -256,6 +220,11 @@ extension GameRoom: MCSessionDelegate {
                 }
                 if self.availablePeers.contains(peerID) {
                     self.availablePeers.removeAll { $0 == peerID }
+                }
+                
+                // Отправляем настройки при подключении
+                if self.isHost, let settings = self.currentSettings {
+                    self.sendGameSettings(settings)
                 }
                 
             case .connecting:
@@ -287,7 +256,10 @@ extension GameRoom: MCSessionDelegate {
                 self.boardState = boardData.boardState
                 self.capturedWhitePieces = boardData.capturedWhite
                 self.capturedBlackPieces = boardData.capturedBlack
-                print("\nGameRoom: Текущее положение шашек:")
+                print("GameRoom: Получено обновление доски от \(peerID.displayName)")
+                print("GameRoom: Захвачено белых шашек: \(boardData.capturedWhite)")
+                print("GameRoom: Захвачено черных шашек: \(boardData.capturedBlack)")
+                print("GameRoom: Текущее состояние доски:")
                 for row in boardData.boardState {
                     print(row.joined(separator: " "))
                 }
