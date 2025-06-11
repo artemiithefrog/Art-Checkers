@@ -272,9 +272,11 @@ class CheckersGame: ObservableObject {
                 let capturedCol = (from.col + to.col) / 2
                 if let capturedPiece = board[capturedRow][capturedCol] {
                     if capturedPiece.color == .white {
-                        capturedWhitePieces += 1
+                        gameRoom?.capturedWhitePieces += 1
+                        capturedWhitePieces = gameRoom?.capturedWhitePieces ?? 0
                     } else {
-                        capturedBlackPieces += 1
+                        gameRoom?.capturedBlackPieces += 1
+                        capturedBlackPieces = gameRoom?.capturedBlackPieces ?? 0
                     }
                 }
                 board[capturedRow][capturedCol] = nil

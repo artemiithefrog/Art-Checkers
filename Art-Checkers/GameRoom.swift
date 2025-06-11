@@ -17,6 +17,14 @@ class GameRoom: NSObject, ObservableObject {
     @Published var statusMessage: String = ""
     @Published var boardState: [[String]] = Array(repeating: Array(repeating: ".", count: 8), count: 8)
     @Published var initialBoard: [[Piece?]]?
+    @Published var capturedWhitePieces: Int = 0
+    @Published var capturedBlackPieces: Int = 0
+    
+    private struct BoardStateData: Codable {
+        let boardState: [[String]]
+        let capturedWhite: Int
+        let capturedBlack: Int
+    }
     
     private var session: MCSession?
     private var advertiser: MCNearbyServiceAdvertiser?
@@ -92,7 +100,11 @@ class GameRoom: NSObject, ObservableObject {
             }
         }
         
-        let data = try? JSONEncoder().encode(["boardState": boardState])
+        let data = try? JSONEncoder().encode(BoardStateData(
+            boardState: boardState,
+            capturedWhite: capturedWhitePieces,
+            capturedBlack: capturedBlackPieces
+        ))
         try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
     }
     
@@ -151,12 +163,13 @@ extension GameRoom: MCSessionDelegate {
                 self.currentPlayer = player
                 print("GameRoom: Получено обновление цвета от \(peerID.displayName) - \(player)")
             }
-        } else if let boardData = try? JSONDecoder().decode([String: [[String]]].self, from: data),
-                  let boardState = boardData["boardState"] {
+        } else if let boardData = try? JSONDecoder().decode(BoardStateData.self, from: data) {
             DispatchQueue.main.async {
-                self.boardState = boardState
+                self.boardState = boardData.boardState
+                self.capturedWhitePieces = boardData.capturedWhite
+                self.capturedBlackPieces = boardData.capturedBlack
                 print("\nGameRoom: Текущее положение шашек:")
-                for row in boardState {
+                for row in boardData.boardState {
                     print(row.joined(separator: " "))
                 }
                 print("")

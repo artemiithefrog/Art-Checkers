@@ -3,6 +3,7 @@ import SwiftUI
 struct CheckersBoard: View {
     let board: [[String]]
     let squareSize: CGFloat
+    let isHost: Bool
     
     var body: some View {
         ZStack {
@@ -22,9 +23,11 @@ struct CheckersBoard: View {
                 ForEach(0..<8) { col in
                     if board[row][col] != "." {
                         let piece = board[row][col]
+                        let displayRow = isHost ? row : 7 - row
+                        let displayCol = isHost ? col : 7 - col
                         let position = CGPoint(
-                            x: CGFloat(col) * squareSize + squareSize / 2,
-                            y: CGFloat(row) * squareSize + squareSize / 2
+                            x: CGFloat(displayCol) * squareSize + squareSize / 2,
+                            y: CGFloat(displayRow) * squareSize + squareSize / 2
                         )
                         
                         Circle()
@@ -129,9 +132,9 @@ struct CheckersBoardView: View {
                     Spacer()
                     
                     HStack(spacing: 20) {
-                        if game.capturedWhitePieces > 0 {
+                        if gameRoom.capturedWhitePieces > 0 {
                             HStack(spacing: -10) {
-                                ForEach(0..<min(game.capturedWhitePieces, 5), id: \.self) { index in
+                                ForEach(0..<min(gameRoom.capturedWhitePieces, 5), id: \.self) { index in
                                     Circle()
                                         .fill(
                                             LinearGradient(
@@ -182,27 +185,31 @@ struct CheckersBoardView: View {
                                     }
                                     return "."
                                 }
-                            }, squareSize: squareSize)
+                            }, squareSize: squareSize, isHost: gameRoom.isHost)
                             
                             if let target = targetPosition {
+                                let displayRow = gameRoom.isHost ? target.row : 7 - target.row
+                                let displayCol = gameRoom.isHost ? target.col : 7 - target.col
                                 Rectangle()
                                     .fill(Color.blue.opacity(0.3))
                                     .frame(width: squareSize, height: squareSize)
                                     .position(
-                                        x: CGFloat(target.col) * squareSize + squareSize / 2,
-                                        y: CGFloat(target.row) * squareSize + squareSize / 2
+                                        x: CGFloat(displayCol) * squareSize + squareSize / 2,
+                                        y: CGFloat(displayRow) * squareSize + squareSize / 2
                                     )
                             }
                             
                             if let selected = selectedPosition,
                                let piece = game.board[selected.row][selected.col] {
                                 ForEach(Array(game.getPossibleMoves(for: piece)), id: \.self) { position in
+                                    let displayRow = gameRoom.isHost ? position.row : 7 - position.row
+                                    let displayCol = gameRoom.isHost ? position.col : 7 - position.col
                                     Circle()
                                         .fill(Color.green.opacity(0.3))
                                         .frame(width: squareSize * 0.3, height: squareSize * 0.3)
                                         .position(
-                                            x: CGFloat(position.col) * squareSize + squareSize / 2,
-                                            y: CGFloat(position.row) * squareSize + squareSize / 2
+                                            x: CGFloat(displayCol) * squareSize + squareSize / 2,
+                                            y: CGFloat(displayRow) * squareSize + squareSize / 2
                                         )
                                         .opacity(possibleMovesOpacity)
                                         .onTapGesture {
@@ -239,15 +246,19 @@ struct CheckersBoardView: View {
                                 ForEach(0..<8) { col in
                                     if let piece = game.board[row][col] {
                                         let isSelected = selectedPosition?.row == row && selectedPosition?.col == col
+                                        let displayRow = gameRoom.isHost ? row : 7 - row
+                                        let displayCol = gameRoom.isHost ? col : 7 - col
                                         
                                         if !isSelected {
                                             PieceView(piece: piece, size: squareSize * 0.8)
                                                 .position(
-                                                    x: CGFloat(col) * squareSize + squareSize / 2,
-                                                    y: CGFloat(row) * squareSize + squareSize / 2
+                                                    x: CGFloat(displayCol) * squareSize + squareSize / 2,
+                                                    y: CGFloat(displayRow) * squareSize + squareSize / 2
                                                 )
                                                 .onTapGesture {
-                                                    if piece.color == game.currentPlayer {
+                                                    if piece.color == game.currentPlayer && 
+                                                       ((gameRoom.isHost && piece.color == settings.playerColor) || 
+                                                        (!gameRoom.isHost && piece.color == settings.playerColor)) {
                                                         selectedPosition = Position(row: row, col: col)
                                                         draggedPiece = piece
                                                         dragOffset = .zero
@@ -261,6 +272,8 @@ struct CheckersBoardView: View {
                             
                             if let draggedPiece = draggedPiece,
                                let selectedPosition = selectedPosition {
+                                let displayRow = gameRoom.isHost ? selectedPosition.row : 7 - selectedPosition.row
+                                let displayCol = gameRoom.isHost ? selectedPosition.col : 7 - selectedPosition.col
                                 PieceView(piece: draggedPiece, size: squareSize * 0.8)
                                     .overlay(
                                         Circle()
@@ -268,8 +281,8 @@ struct CheckersBoardView: View {
                                             .frame(width: squareSize * 0.8, height: squareSize * 0.8)
                                     )
                                     .position(
-                                        x: CGFloat(selectedPosition.col) * squareSize + squareSize / 2,
-                                        y: CGFloat(selectedPosition.row) * squareSize + squareSize / 2
+                                        x: CGFloat(displayCol) * squareSize + squareSize / 2,
+                                        y: CGFloat(displayRow) * squareSize + squareSize / 2
                                     )
                                     .offset(isMoving ? moveOffset : dragOffset)
                                     .gesture(
@@ -282,30 +295,36 @@ struct CheckersBoardView: View {
                                                 }
                                                 
                                                 let pieceCenter = CGPoint(
-                                                    x: CGFloat(selectedPosition.col) * squareSize + squareSize / 2 + value.translation.width,
-                                                    y: CGFloat(selectedPosition.row) * squareSize + squareSize / 2 + value.translation.height
+                                                    x: CGFloat(displayCol) * squareSize + squareSize / 2 + value.translation.width,
+                                                    y: CGFloat(displayRow) * squareSize + squareSize / 2 + value.translation.height
                                                 )
                                                 
                                                 let targetCol = Int(round((pieceCenter.x - squareSize / 2) / squareSize))
                                                 let targetRow = Int(round((pieceCenter.y - squareSize / 2) / squareSize))
                                                 
-                                                if targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol < 8 {
-                                                    targetPosition = Position(row: targetRow, col: targetCol)
+                                                let actualTargetCol = gameRoom.isHost ? targetCol : 7 - targetCol
+                                                let actualTargetRow = gameRoom.isHost ? targetRow : 7 - targetRow
+                                                
+                                                if actualTargetRow >= 0 && actualTargetRow < 8 && actualTargetCol >= 0 && actualTargetCol < 8 {
+                                                    targetPosition = Position(row: actualTargetRow, col: actualTargetCol)
                                                 } else {
                                                     targetPosition = nil
                                                 }
                                             }
                                             .onEnded { value in
                                                 let pieceCenter = CGPoint(
-                                                    x: CGFloat(selectedPosition.col) * squareSize + squareSize / 2 + value.translation.width,
-                                                    y: CGFloat(selectedPosition.row) * squareSize + squareSize / 2 + value.translation.height
+                                                    x: CGFloat(displayCol) * squareSize + squareSize / 2 + value.translation.width,
+                                                    y: CGFloat(displayRow) * squareSize + squareSize / 2 + value.translation.height
                                                 )
                                                 
                                                 let targetCol = Int(round((pieceCenter.x - squareSize / 2) / squareSize))
                                                 let targetRow = Int(round((pieceCenter.y - squareSize / 2) / squareSize))
                                                 
-                                                if targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol < 8 {
-                                                    let targetPosition = Position(row: targetRow, col: targetCol)
+                                                let actualTargetCol = gameRoom.isHost ? targetCol : 7 - targetCol
+                                                let actualTargetRow = gameRoom.isHost ? targetRow : 7 - targetRow
+                                                
+                                                if actualTargetRow >= 0 && actualTargetRow < 8 && actualTargetCol >= 0 && actualTargetCol < 8 {
+                                                    let targetPosition = Position(row: actualTargetRow, col: actualTargetCol)
                                                     
                                                     let pieceOverlap = calculatePieceOverlap(
                                                         pieceCenter: pieceCenter,
@@ -320,8 +339,8 @@ struct CheckersBoardView: View {
                                                     if pieceOverlap >= 0.4 && game.isValidMove(from: selectedPosition, to: targetPosition) {
                                                         withAnimation(.easeInOut(duration: 0.3)) {
                                                             moveOffset = CGSize(
-                                                                width: CGFloat(targetCol - selectedPosition.col) * squareSize,
-                                                                height: CGFloat(targetRow - selectedPosition.row) * squareSize
+                                                                width: CGFloat(actualTargetCol - selectedPosition.col) * squareSize,
+                                                                height: CGFloat(actualTargetRow - selectedPosition.row) * squareSize
                                                             )
                                                         }
                                                         
@@ -374,9 +393,9 @@ struct CheckersBoardView: View {
                     }
                     
                     HStack(spacing: 20) {
-                        if game.capturedBlackPieces > 0 {
+                        if gameRoom.capturedBlackPieces > 0 {
                             HStack(spacing: -10) {
-                                ForEach(0..<min(game.capturedBlackPieces, 5), id: \.self) { index in
+                                ForEach(0..<min(gameRoom.capturedBlackPieces, 5), id: \.self) { index in
                                     Circle()
                                         .fill(
                                             LinearGradient(
@@ -428,25 +447,21 @@ struct CheckersBoardView: View {
                 }
             }
             .onChange(of: gameRoom.boardState) { newBoardState in
-                if !gameRoom.isHost {
-                    for row in 0..<8 {
-                        for col in 0..<8 {
-                            let pieceState = newBoardState[row][col]
-                            if pieceState != "." {
-                                let color: PieceColor = pieceState.hasPrefix("W") ? .white : .black
-                                let isKing = pieceState.hasSuffix("K")
-                                game.board[row][col] = Piece(color: color, type: isKing ? .king : .normal, position: Position(row: row, col: col))
-                            } else {
-                                game.board[row][col] = nil
-                            }
+                for row in 0..<8 {
+                    for col in 0..<8 {
+                        let pieceState = newBoardState[row][col]
+                        if pieceState != "." {
+                            let color: PieceColor = pieceState.hasPrefix("W") ? .white : .black
+                            let isKing = pieceState.hasSuffix("K")
+                            game.board[row][col] = Piece(color: color, type: isKing ? .king : .normal, position: Position(row: row, col: col))
+                        } else {
+                            game.board[row][col] = nil
                         }
                     }
                 }
             }
             .onChange(of: gameRoom.currentPlayer) { newPlayer in
-                if !gameRoom.isHost {
-                    game.currentPlayer = newPlayer == "White" ? .white : .black
-                }
+                game.currentPlayer = newPlayer == "White" ? .white : .black
             }
             .onDisappear {
                 timer?.invalidate()
