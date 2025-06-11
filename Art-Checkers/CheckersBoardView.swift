@@ -461,7 +461,7 @@ struct CheckersBoardView: View {
                        let initialBlackTime = timerValues["initialBlackTime"] {
                         whiteTimeRemaining = initialWhiteTime
                         blackTimeRemaining = initialBlackTime
-                        if settings.timePerMove > 0 {
+                        if settings.timePerMove > 0 && gameRoom.isHost {
                             startTimer()
                         }
                     }
@@ -483,6 +483,13 @@ struct CheckersBoardView: View {
             }
             .onChange(of: gameRoom.currentPlayer) { newPlayer in
                 game.currentPlayer = newPlayer == "White" ? .white : .black
+                
+                if !gameRoom.isHost && isFirstMove && newPlayer == "Black" {
+                    isFirstMove = false
+                    if settings.timePerMove > 0 {
+                        startTimer()
+                    }
+                }
             }
             .onDisappear {
                 timer?.invalidate()
