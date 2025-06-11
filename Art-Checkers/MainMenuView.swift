@@ -14,47 +14,88 @@ struct MainMenuView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                HStack {
-                    Spacer()
-                    Button {
-                        showSettingsSheet = true
-                    } label: {
-                        Image(systemName: "gear")
-                            .font(.system(size: 24))
-                            .foregroundColor(.gray)
+            ZStack {
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 0.98, green: 0.98, blue: 0.98),
+                        Color(red: 0.95, green: 0.95, blue: 0.95)
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                
+                VStack(spacing: 30) {
+                    HStack {
+                        Spacer()
+                        Button {
+                            showSettingsSheet = true
+                        } label: {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.4))
+                                .frame(width: 44, height: 44)
+                                .background(Color.white)
+                                .clipShape(Circle())
+                                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.top, 20)
                     }
-                    .padding(.trailing)
-                }
-                
-                Text("Art Checkers")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .padding(.bottom, 40)
-                
-                Button {
-                    showNewGameSheet = true
-                } label: {
-                    Text("New Game")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .frame(width: 250, height: 50)
-                        .background(Color.blue)
-                        .cornerRadius(10)
-                }
-                
-                Button {
-                    gameRoom.startBrowsing()
-                } label: {
-                    Text("Connect to room")
-                        .font(.title2)
-                        .foregroundColor(Color.white)
-                        .frame(width: 250, height: 50)
-                        .background(Color.green)
-                        .cornerRadius(10)
+                    
+                    Spacer()
+                    
+                    VStack(spacing: 16) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color.white)
+                                .frame(width: 100, height: 100)
+                                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                            
+                            VStack(spacing: 0) {
+                                ForEach(0..<4) { row in
+                                    HStack(spacing: 0) {
+                                        ForEach(0..<4) { col in
+                                            Rectangle()
+                                                .fill((row + col) % 2 == 0 ? 
+                                                    Color(red: 0.2, green: 0.2, blue: 0.2) : 
+                                                    Color(red: 0.9, green: 0.9, blue: 0.9))
+                                                .frame(width: 25, height: 25)
+                                        }
+                                    }
+                                }
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
+                        
+                        Text("Art Checkers")
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
+                    }
+                    .padding(.bottom, 60)
+
+                    VStack(spacing: 20) {
+                        MenuButton(
+                            title: "New Game",
+                            icon: "plus.circle.fill",
+                            color: Color(red: 0.2, green: 0.6, blue: 0.9)
+                        ) {
+                            showNewGameSheet = true
+                        }
+                        
+                        MenuButton(
+                            title: "Connect to Room",
+                            icon: "link.circle.fill",
+                            color: Color(red: 0.3, green: 0.8, blue: 0.6)
+                        ) {
+                            gameRoom.startBrowsing()
+                        }
+                    }
+                    .padding(.horizontal, 30)
+                    
+                    Spacer()
                 }
             }
-            .padding()
             .sheet(isPresented: $showNewGameSheet) {
                 NewGameView(showGame: $showGame, gameSettings: $gameSettings)
                     .environmentObject(gameRoom)
@@ -95,6 +136,37 @@ struct MainMenuView: View {
                 }
                 .navigationBarBackButtonHidden()
             }
+        }
+    }
+}
+
+struct MenuButton: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                Image(systemName: icon)
+                    .font(.system(size: 24))
+                Text(title)
+                    .font(.system(size: 20, weight: .semibold))
+                Spacer()
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [color, color.opacity(0.8)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: color.opacity(0.3), radius: 8, x: 0, y: 4)
         }
     }
 }
