@@ -11,6 +11,7 @@ import MultipeerConnectivity
 class GameRoom: NSObject, ObservableObject {
     @Published var counter1: Int = 0
     @Published var counter2: Int = 0
+    @Published var currentPlayer = "White"
     @Published var isHost: Bool = false
     @Published var connectedPeers: [MCPeerID] = []
     @Published var statusMessage: String = ""
@@ -66,11 +67,17 @@ class GameRoom: NSObject, ObservableObject {
         sendCounterUpdate()
     }
     
+    func playerChanged(currentPlayer: String) {
+        self.currentPlayer = currentPlayer
+        sendCounterUpdate()
+    }
+    
     private func sendCounterUpdate() {
         guard let session = session else { return }
-        let data = try? JSONEncoder().encode(["counter1": counter1, "counter2": counter2])
+//        let data = try? JSONEncoder().encode(["counter1": counter1, "counter2": counter2])
+        let data = try? JSONEncoder().encode(["currentPlayer": currentPlayer])
         try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
-        print("GameRoom: Отправлено обновление счетчиков - counter1: \(counter1), counter2: \(counter2)")
+        print("GameRoom: Отправлено обновление цвета: \(currentPlayer)")
     }
 }
 
@@ -98,11 +105,11 @@ extension GameRoom: MCSessionDelegate {
     }
     
     func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
-        if let counters = try? JSONDecoder().decode([String: Int].self, from: data) {
+        if let playerData = try? JSONDecoder().decode([String: String].self, from: data),
+           let player = playerData["currentPlayer"] {
             DispatchQueue.main.async {
-                self.counter1 = counters["counter1"] ?? 0
-                self.counter2 = counters["counter2"] ?? 0
-                print("GameRoom: Получено обновление счетчиков от \(peerID.displayName) - counter1: \(self.counter1), counter2: \(self.counter2)")
+                self.currentPlayer = player
+                print("GameRoom: Получено обновление цвета от \(peerID.displayName) - \(player)")
             }
         }
     }

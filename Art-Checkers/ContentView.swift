@@ -26,6 +26,9 @@ struct ContentView: View {
                 settings: settings,
                 showGame: $showGame
             )
+            .onAppear {
+                game.gameRoom = gameRoom
+            }
         } else {
             MainMenuView(showGame: $showGame, gameSettings: $gameSettings)
                 .environmentObject(gameRoom)

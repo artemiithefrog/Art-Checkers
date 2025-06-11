@@ -34,6 +34,7 @@ class CheckersGame: ObservableObject {
     @Published var winner: PieceColor?
     @Published var capturedWhitePieces: Int = 0
     @Published var capturedBlackPieces: Int = 0
+    var gameRoom: GameRoom?
     
     init() {
         setupBoard()
@@ -276,6 +277,7 @@ class CheckersGame: ObservableObject {
             }
             
             currentPlayer = currentPlayer == .white ? .black : .white
+            gameRoom?.playerChanged(currentPlayer: currentPlayer == .white ? "White" : "Black")
             checkGameOver()
         }
     }

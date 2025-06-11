@@ -312,41 +312,7 @@ struct CounterView: View {
                 .foregroundColor(.gray)
                 .padding(.top)
             
-            // Верхний счетчик (управляется подключенным пользователем)
-            VStack {
-                Text("Счетчик игрока 2")
-                    .font(.headline)
-                Text("\(gameRoom.counter2)")
-                    .font(.system(size: 40, weight: .bold))
-                Button(action: {
-                    gameRoom.incrementCounter2()
-                }) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 50))
-                        .foregroundColor(.blue)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.gray.opacity(0.1))
-            
-            Divider()
-            
-            // Нижний счетчик (управляется хостом)
-            VStack {
-                Text("Счетчик игрока 1")
-                    .font(.headline)
-                Text("\(gameRoom.counter1)")
-                    .font(.system(size: 40, weight: .bold))
-                Button(action: {
-                    gameRoom.incrementCounter1()
-                }) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 50))
-                        .foregroundColor(.blue)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.gray.opacity(0.1))
+            Text("current player color: \(gameRoom.currentPlayer)")
         }
     }
 }
