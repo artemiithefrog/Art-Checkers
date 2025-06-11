@@ -4,6 +4,18 @@ struct CheckersBoard: View {
     let board: [[String]]
     let squareSize: CGFloat
     let isHost: Bool
+    let boardStyle: Int
+    
+    private let boardStyles = [
+        (name: "Classic Brown", colors: (Color(red: 0.6, green: 0.4, blue: 0.2), Color(red: 0.9, green: 0.7, blue: 0.5))),
+        (name: "Modern Gray", colors: (Color(red: 0.3, green: 0.3, blue: 0.3), Color(red: 0.8, green: 0.8, blue: 0.8))),
+        (name: "Elegant Blue", colors: (Color(red: 0.2, green: 0.4, blue: 0.8), Color(red: 0.6, green: 0.8, blue: 1.0))),
+        (name: "Vintage Green", colors: (Color(red: 0.2, green: 0.6, blue: 0.3), Color(red: 0.6, green: 0.9, blue: 0.5))),
+        (name: "Royal Purple", colors: (Color(red: 0.4, green: 0.2, blue: 0.6), Color(red: 0.7, green: 0.5, blue: 0.9))),
+        (name: "Sunset Orange", colors: (Color(red: 0.8, green: 0.4, blue: 0.2), Color(red: 1.0, green: 0.7, blue: 0.5))),
+        (name: "Cherry Red", colors: (Color(red: 0.7, green: 0.2, blue: 0.2), Color(red: 0.9, green: 0.5, blue: 0.5))),
+        (name: "Mint Green", colors: (Color(red: 0.2, green: 0.7, blue: 0.5), Color(red: 0.5, green: 0.9, blue: 0.7)))
+    ]
     
     var body: some View {
         ZStack {
@@ -12,7 +24,7 @@ struct CheckersBoard: View {
                     HStack(spacing: 0) {
                         ForEach(0..<8) { col in
                             Rectangle()
-                                .fill((row + col) % 2 == 0 ? Color.gray.opacity(0.3) : Color.gray.opacity(0.1))
+                                .fill((row + col) % 2 == 0 ? boardStyles[boardStyle].colors.0 : boardStyles[boardStyle].colors.1)
                                 .frame(width: squareSize, height: squareSize)
                         }
                     }
@@ -178,14 +190,19 @@ struct CheckersBoardView: View {
                         let squareSize = min(geometry.size.width, geometry.size.height) / 8
                         
                         ZStack {
-                            CheckersBoard(board: game.board.map { row in
-                                row.map { piece in
-                                    if let piece = piece {
-                                        return piece.color == .white ? (piece.isKing ? "WK" : "W") : (piece.isKing ? "BK" : "B")
+                            CheckersBoard(
+                                board: game.board.map { row in
+                                    row.map { piece in
+                                        if let piece = piece {
+                                            return piece.color == .white ? (piece.isKing ? "WK" : "W") : (piece.isKing ? "BK" : "B")
+                                        }
+                                        return "."
                                     }
-                                    return "."
-                                }
-                            }, squareSize: squareSize, isHost: gameRoom.isHost)
+                                },
+                                squareSize: squareSize,
+                                isHost: gameRoom.isHost,
+                                boardStyle: settings.boardStyle
+                            )
                             
                             if let target = targetPosition {
                                 let displayRow = gameRoom.isHost ? target.row : 7 - target.row

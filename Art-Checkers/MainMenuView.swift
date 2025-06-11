@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainMenuView: View {
     @State private var showNewGameSheet = false
+    @State private var showSettingsSheet = false
     @EnvironmentObject var gameRoom: GameRoom
     @Binding var showGame: Bool
     @Binding var gameSettings: GameSettings?
@@ -14,6 +15,18 @@ struct MainMenuView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
+                HStack {
+                    Spacer()
+                    Button {
+                        showSettingsSheet = true
+                    } label: {
+                        Image(systemName: "gear")
+                            .font(.system(size: 24))
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.trailing)
+                }
+                
                 Text("Art Checkers")
                     .font(.largeTitle)
                     .fontWeight(.bold)
@@ -46,6 +59,9 @@ struct MainMenuView: View {
                 NewGameView(showGame: $showGame, gameSettings: $gameSettings)
                     .environmentObject(gameRoom)
             }
+            .sheet(isPresented: $showSettingsSheet) {
+                SettingsView()
+            }
             .onChange(of: gameRoom.connectedPeers.isEmpty) { isEmpty in
                 if !isEmpty {
                     showGameView = true
@@ -61,7 +77,7 @@ struct MainMenuView: View {
                         playerColor: .black,
                         timerMode: .noLimit,
                         timePerMove: 0,
-                        boardStyle: 0
+                        boardStyle: UserDefaultsManager.shared.getSelectedBoardStyle()
                     ),
                     showGame: $showGameView,
                     gameRoom: gameRoom
@@ -77,23 +93,10 @@ struct MainMenuView: View {
 
 struct NewGameView: View {
     @Environment(\.dismiss) var dismiss
-    @State private var selectedBoardStyle = UserDefaultsManager.shared.getSelectedBoardStyle()
     @State private var timePerMove: Double = 0
-    @State private var showBoardStylePicker = false
     @Binding var showGame: Bool
     @Binding var gameSettings: GameSettings?
     @EnvironmentObject var gameRoom: GameRoom
-    
-    private let boardStyles = [
-        (name: "Classic Brown", colors: (Color(red: 0.6, green: 0.4, blue: 0.2), Color(red: 0.9, green: 0.7, blue: 0.5))),
-        (name: "Modern Gray", colors: (Color(red: 0.3, green: 0.3, blue: 0.3), Color(red: 0.8, green: 0.8, blue: 0.8))),
-        (name: "Elegant Blue", colors: (Color(red: 0.2, green: 0.4, blue: 0.8), Color(red: 0.6, green: 0.8, blue: 1.0))),
-        (name: "Vintage Green", colors: (Color(red: 0.2, green: 0.6, blue: 0.3), Color(red: 0.6, green: 0.9, blue: 0.5))),
-        (name: "Royal Purple", colors: (Color(red: 0.4, green: 0.2, blue: 0.6), Color(red: 0.7, green: 0.5, blue: 0.9))),
-        (name: "Sunset Orange", colors: (Color(red: 0.8, green: 0.4, blue: 0.2), Color(red: 1.0, green: 0.7, blue: 0.5))),
-        (name: "Cherry Red", colors: (Color(red: 0.7, green: 0.2, blue: 0.2), Color(red: 0.9, green: 0.5, blue: 0.5))),
-        (name: "Mint Green", colors: (Color(red: 0.2, green: 0.7, blue: 0.5), Color(red: 0.5, green: 0.9, blue: 0.7)))
-    ]
     
     var body: some View {
         VStack(spacing: 0) {
@@ -109,35 +112,6 @@ struct NewGameView: View {
             .padding(.bottom, 40)
 
             VStack(spacing: 24) {
-                Button(action: {
-                    showBoardStylePicker = true
-                }) {
-                    HStack {
-                        Image(systemName: "square.grid.2x2")
-                            .font(.system(size: 20))
-                            .foregroundColor(.gray)
-                            .frame(width: 30)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Board Style")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.gray)
-                            Text(boardStyles[selectedBoardStyle].name)
-                                .font(.system(size: 14))
-                                .foregroundColor(.gray.opacity(0.7))
-                        }
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.gray.opacity(0.7))
-                    }
-                    .padding()
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(16)
-                }
-
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Image(systemName: "timer")
@@ -172,7 +146,7 @@ struct NewGameView: View {
                     playerColor: .white,
                     timerMode: timePerMove > 0 ? .timePerMove : .noLimit,
                     timePerMove: timePerMove,
-                    boardStyle: selectedBoardStyle
+                    boardStyle: UserDefaultsManager.shared.getSelectedBoardStyle()
                 )
                 
                 gameSettings = settings
@@ -201,6 +175,74 @@ struct NewGameView: View {
             }
             .padding(.horizontal)
             .padding(.bottom, 30)
+        }
+    }
+}
+
+struct SettingsView: View {
+    @Environment(\.dismiss) var dismiss
+    @State private var selectedBoardStyle = UserDefaultsManager.shared.getSelectedBoardStyle()
+    @State private var showBoardStylePicker = false
+    
+    private let boardStyles = [
+        (name: "Classic Brown", colors: (Color(red: 0.6, green: 0.4, blue: 0.2), Color(red: 0.9, green: 0.7, blue: 0.5))),
+        (name: "Modern Gray", colors: (Color(red: 0.3, green: 0.3, blue: 0.3), Color(red: 0.8, green: 0.8, blue: 0.8))),
+        (name: "Elegant Blue", colors: (Color(red: 0.2, green: 0.4, blue: 0.8), Color(red: 0.6, green: 0.8, blue: 1.0))),
+        (name: "Vintage Green", colors: (Color(red: 0.2, green: 0.6, blue: 0.3), Color(red: 0.6, green: 0.9, blue: 0.5))),
+        (name: "Royal Purple", colors: (Color(red: 0.4, green: 0.2, blue: 0.6), Color(red: 0.7, green: 0.5, blue: 0.9))),
+        (name: "Sunset Orange", colors: (Color(red: 0.8, green: 0.4, blue: 0.2), Color(red: 1.0, green: 0.7, blue: 0.5))),
+        (name: "Cherry Red", colors: (Color(red: 0.7, green: 0.2, blue: 0.2), Color(red: 0.9, green: 0.5, blue: 0.5))),
+        (name: "Mint Green", colors: (Color(red: 0.2, green: 0.7, blue: 0.5), Color(red: 0.5, green: 0.9, blue: 0.7)))
+    ]
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                VStack(spacing: 8) {
+                    Text("Settings")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundColor(.gray)
+                }
+                .padding(.top, 40)
+                .padding(.bottom, 40)
+
+                VStack(spacing: 24) {
+                    Button(action: {
+                        showBoardStylePicker = true
+                    }) {
+                        HStack {
+                            Image(systemName: "square.grid.2x2")
+                                .font(.system(size: 20))
+                                .foregroundColor(.gray)
+                                .frame(width: 30)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Board Style")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.gray)
+                                Text(boardStyles[selectedBoardStyle].name)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray.opacity(0.7))
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.gray.opacity(0.7))
+                        }
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(16)
+                    }
+                }
+                .padding(.horizontal)
+                
+                Spacer()
+            }
+            .navigationBarItems(trailing: Button("Done") {
+                dismiss()
+            })
         }
         .sheet(isPresented: $showBoardStylePicker) {
             BoardStylePickerView(selectedStyle: $selectedBoardStyle)
