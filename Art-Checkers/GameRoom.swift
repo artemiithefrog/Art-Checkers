@@ -126,7 +126,8 @@ class GameRoom: NSObject, ObservableObject {
         for row in 0..<8 {
             for col in 0..<8 {
                 if let piece = board[row][col] {
-                    boardState[row][col] = piece.color == .white ? (piece.isKing ? "WK" : "W") : (piece.isKing ? "BK" : "B")
+                    let isKing = piece.isKing || piece.type == .king
+                    boardState[row][col] = piece.color == .white ? (isKing ? "WK" : "W") : (isKing ? "BK" : "B")
                 }
             }
         }

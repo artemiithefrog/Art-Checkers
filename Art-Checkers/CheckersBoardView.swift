@@ -474,7 +474,10 @@ struct CheckersBoardView: View {
                         if pieceState != "." {
                             let color: PieceColor = pieceState.hasPrefix("W") ? .white : .black
                             let isKing = pieceState.hasSuffix("K")
-                            game.board[row][col] = Piece(color: color, type: isKing ? .king : .normal, position: Position(row: row, col: col))
+                            let position = Position(row: row, col: col)
+                            var piece = Piece(color: color, type: isKing ? .king : .normal, position: position)
+                            piece.isKing = isKing
+                            game.board[row][col] = piece
                         } else {
                             game.board[row][col] = nil
                         }

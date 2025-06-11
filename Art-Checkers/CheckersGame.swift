@@ -67,34 +67,18 @@ class CheckersGame: ObservableObject {
         let directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
         
         for (rowDir, colDir) in directions {
-            var currentRow = from.row + rowDir
-            var currentCol = from.col + colDir
-            var foundPiece = false
-            var captureRow = -1
-            var captureCol = -1
+            let captureRow = from.row + rowDir * 2
+            let captureCol = from.col + colDir * 2
             
-            while currentRow >= 0 && currentRow < 8 && currentCol >= 0 && currentCol < 8 {
-                if let currentPiece = board[currentRow][currentCol] {
-                    if !foundPiece {
-                        if currentPiece.color != piece.color {
-                            foundPiece = true
-                            captureRow = currentRow
-                            captureCol = currentCol
-                        } else {
-                            break
-                        }
-                    } else {
-                        if currentPiece.color == piece.color {
-                            break
-                        } else {
-                            break
-                        }
-                    }
-                } else if foundPiece {
-                    moves.insert(Position(row: currentRow, col: currentCol))
+            if captureRow >= 0 && captureRow < 8 && captureCol >= 0 && captureCol < 8 {
+                let capturedRow = from.row + rowDir
+                let capturedCol = from.col + colDir
+                
+                if let capturedPiece = board[capturedRow][capturedCol],
+                   capturedPiece.color != piece.color,
+                   board[captureRow][captureCol] == nil {
+                    moves.insert(Position(row: captureRow, col: captureCol))
                 }
-                currentRow += rowDir
-                currentCol += colDir
             }
         }
         return moves
@@ -205,20 +189,8 @@ class CheckersGame: ObservableObject {
         let rowDiff = to.row - from.row
         let colDiff = to.col - from.col
         
-        if abs(rowDiff) != abs(colDiff) { return false }
-        
-        let rowDir = rowDiff > 0 ? 1 : -1
-        let colDir = colDiff > 0 ? 1 : -1
-        
-        var currentRow = from.row + rowDir
-        var currentCol = from.col + colDir
-        
-        while currentRow != to.row && currentCol != to.col {
-            if board[currentRow][currentCol] != nil {
-                return false
-            }
-            currentRow += rowDir
-            currentCol += colDir
+        if abs(rowDiff) != 1 || abs(colDiff) != 1 {
+            return false
         }
         
         return true
@@ -371,17 +343,13 @@ class CheckersGame: ObservableObject {
         if piece.type == .king {
             let directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
             for (rowDir, colDir) in directions {
-                var currentRow = piece.position.row + rowDir
-                var currentCol = piece.position.col + colDir
+                let newRow = piece.position.row + rowDir
+                let newCol = piece.position.col + colDir
                 
-                while currentRow >= 0 && currentRow < 8 && currentCol >= 0 && currentCol < 8 {
-                    if board[currentRow][currentCol] == nil {
-                        moves.insert(Position(row: currentRow, col: currentCol))
-                    } else {
-                        break
+                if newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8 {
+                    if board[newRow][newCol] == nil {
+                        moves.insert(Position(row: newRow, col: newCol))
                     }
-                    currentRow += rowDir
-                    currentCol += colDir
                 }
             }
         } else {
