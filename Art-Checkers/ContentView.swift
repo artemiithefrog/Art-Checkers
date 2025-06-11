@@ -24,7 +24,8 @@ struct ContentView: View {
                 draggedPiece: $draggedPiece,
                 dragOffset: $dragOffset,
                 settings: settings,
-                showGame: $showGame
+                showGame: $showGame,
+                gameRoom: gameRoom
             )
             .onAppear {
                 game.gameRoom = gameRoom

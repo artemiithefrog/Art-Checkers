@@ -5,10 +5,14 @@ struct MainMenuView: View {
     @EnvironmentObject var gameRoom: GameRoom
     @Binding var showGame: Bool
     @Binding var gameSettings: GameSettings?
-    @State private var showCounterView = false
+    @State private var showGameView = false
+    @State private var selectedPosition: Position?
+    @State private var draggedPiece: Piece?
+    @State private var dragOffset: CGSize = .zero
+    @StateObject private var game = CheckersGame()
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 20) {
                 Text("Art Checkers")
                     .font(.largeTitle)
@@ -44,12 +48,28 @@ struct MainMenuView: View {
             }
             .onChange(of: gameRoom.connectedPeers.isEmpty) { isEmpty in
                 if !isEmpty {
-                    showCounterView = true
+                    showGameView = true
                 }
             }
-            .sheet(isPresented: $showCounterView) {
-                CounterView()
-                    .environmentObject(gameRoom)
+            .navigationDestination(isPresented: $showGameView) {
+                CheckersBoardView(
+                    game: game,
+                    selectedPosition: $selectedPosition,
+                    draggedPiece: $draggedPiece,
+                    dragOffset: $dragOffset,
+                    settings: GameSettings(
+                        playerColor: .black,
+                        timerMode: .noLimit,
+                        timePerMove: 0,
+                        boardStyle: 0
+                    ),
+                    showGame: $showGameView,
+                    gameRoom: gameRoom
+                )
+                .onAppear {
+                    game.gameRoom = gameRoom
+                }
+                .navigationBarBackButtonHidden()
             }
         }
     }
@@ -298,61 +318,6 @@ struct BoardStylePickerView: View {
                         .foregroundColor(.gray)
                 }
             )
-        }
-    }
-}
-
-struct CounterView: View {
-    @EnvironmentObject var gameRoom: GameRoom
-    @State private var previousBoardState: [[String]] = Array(repeating: Array(repeating: ".", count: 8), count: 8)
-    @State private var piecePositions: [String: CGPoint] = [:]
-    
-    var body: some View {
-        ZStack {
-            VStack {
-                HStack {
-                    Spacer()
-                    
-                    Text("Current Player: \(gameRoom.currentPlayer)")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.gray)
-                    
-                    Spacer()
-                    
-                    Color.clear
-                        .frame(width: 40, height: 40)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-
-                Spacer()
-                
-                GeometryReader { geometry in
-                    let squareSize = min(geometry.size.width, geometry.size.height) / 8
-                    
-                    CheckersBoard(board: gameRoom.boardState, squareSize: squareSize)
-                        .onChange(of: gameRoom.boardState) { newState in
-                            for row in 0..<8 {
-                                for col in 0..<8 {
-                                    let piece = newState[row][col]
-                                    if piece != "." {
-                                        let position = CGPoint(
-                                            x: CGFloat(col) * squareSize + squareSize / 2,
-                                            y: CGFloat(row) * squareSize + squareSize / 2
-                                        )
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                            piecePositions[piece] = position
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                }
-                .aspectRatio(1, contentMode: .fit)
-                .padding()
-                
-                Spacer()
-            }
         }
     }
 }

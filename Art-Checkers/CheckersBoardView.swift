@@ -81,8 +81,9 @@ struct CheckersBoardView: View {
     @State private var blackTimeRemaining: Int
     @State private var timer: Timer?
     @State private var isFirstMove = true
+    @ObservedObject var gameRoom: GameRoom
     
-    init(game: CheckersGame, selectedPosition: Binding<Position?>, draggedPiece: Binding<Piece?>, dragOffset: Binding<CGSize>, settings: GameSettings, showGame: Binding<Bool>) {
+    init(game: CheckersGame, selectedPosition: Binding<Position?>, draggedPiece: Binding<Piece?>, dragOffset: Binding<CGSize>, settings: GameSettings, showGame: Binding<Bool>, gameRoom: GameRoom) {
         self.game = game
         self._selectedPosition = selectedPosition
         self._draggedPiece = draggedPiece
@@ -92,233 +93,249 @@ struct CheckersBoardView: View {
         self._whiteTimeRemaining = State(initialValue: Int(settings.timePerMove))
         self._blackTimeRemaining = State(initialValue: Int(settings.timePerMove))
         self._isFirstMove = State(initialValue: true)
+        self.gameRoom = gameRoom
     }
     
     var body: some View {
-        ZStack {
-            VStack {
-                HStack {
-                    Button(action: {
-                        showExitAlert = true
-                    }) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 20, weight: .medium))
+        NavigationView {
+            ZStack {
+                VStack {
+                    HStack {
+                        Button(action: {
+                            showExitAlert = true
+                        }) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundColor(.gray)
+                                .frame(width: 40, height: 40)
+                                .background(Color.gray.opacity(0.1))
+                                .clipShape(Circle())
+                        }
+                        
+                        Spacer()
+                        
+                        Text("Current Player: \(game.currentPlayer == .white ? "White" : "Black")")
+                            .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.gray)
+                        
+                        Spacer()
+                        
+                        Color.clear
                             .frame(width: 40, height: 40)
-                            .background(Color.gray.opacity(0.1))
-                            .clipShape(Circle())
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 20) {
+                        if game.capturedWhitePieces > 0 {
+                            HStack(spacing: -10) {
+                                ForEach(0..<min(game.capturedWhitePieces, 5), id: \.self) { index in
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                gradient: Gradient(colors: [Color.white, Color.white.opacity(0.8)]),
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 30, height: 30)
+                                        .shadow(radius: 2)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.black.opacity(0.3), lineWidth: 1)
+                                                .padding(4)
+                                        )
+                                }
+                            }
+                        }
+                    }
+                    .frame(height: 30)
+                    .padding(.horizontal)
+                    
+                    HStack {
+                        if settings.timePerMove > 0 {
+                            HStack {
+                                Text("\(formatTime(blackTimeRemaining))")
+                                    .font(.system(.title2, design: .monospaced))
+                                    .foregroundColor(.white)
+                                    .padding(8)
+                                    .background(Color.black)
+                                    .cornerRadius(8)
+                                    .shadow(radius: 2)
+                            }
+                            .padding(.horizontal)
+                            .padding(.bottom, -20)
+                        }
+                        Spacer()
                     }
                     
-                    Spacer()
-                    
-                    Text("Current Player: \(game.currentPlayer == .white ? "White" : "Black")")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.gray)
-                    
-                    Spacer()
-                    
-                    Color.clear
-                        .frame(width: 40, height: 40)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-
-                Spacer()
-                
-                HStack(spacing: 20) {
-                    if game.capturedWhitePieces > 0 {
-                        HStack(spacing: -10) {
-                            ForEach(0..<min(game.capturedWhitePieces, 5), id: \.self) { index in
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            gradient: Gradient(colors: [Color.white, Color.white.opacity(0.8)]),
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
+                    GeometryReader { geometry in
+                        let squareSize = min(geometry.size.width, geometry.size.height) / 8
+                        
+                        ZStack {
+                            CheckersBoard(board: game.board.map { row in
+                                row.map { piece in
+                                    if let piece = piece {
+                                        return piece.color == .white ? (piece.isKing ? "WK" : "W") : (piece.isKing ? "BK" : "B")
+                                    }
+                                    return "."
+                                }
+                            }, squareSize: squareSize)
+                            
+                            if let target = targetPosition {
+                                Rectangle()
+                                    .fill(Color.blue.opacity(0.3))
+                                    .frame(width: squareSize, height: squareSize)
+                                    .position(
+                                        x: CGFloat(target.col) * squareSize + squareSize / 2,
+                                        y: CGFloat(target.row) * squareSize + squareSize / 2
                                     )
-                                    .frame(width: 30, height: 30)
-                                    .shadow(radius: 2)
+                            }
+                            
+                            if let selected = selectedPosition,
+                               let piece = game.board[selected.row][selected.col] {
+                                ForEach(Array(game.getPossibleMoves(for: piece)), id: \.self) { position in
+                                    Circle()
+                                        .fill(Color.green.opacity(0.3))
+                                        .frame(width: squareSize * 0.3, height: squareSize * 0.3)
+                                        .position(
+                                            x: CGFloat(position.col) * squareSize + squareSize / 2,
+                                            y: CGFloat(position.row) * squareSize + squareSize / 2
+                                        )
+                                        .opacity(possibleMovesOpacity)
+                                        .onTapGesture {
+                                            if game.isValidMove(from: selected, to: position) {
+                                                let rowDiff = position.row - selected.row
+                                                let colDiff = position.col - selected.col
+                                                
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                    isMoving = true
+                                                    moveOffset = CGSize(
+                                                        width: CGFloat(colDiff) * squareSize,
+                                                        height: CGFloat(rowDiff) * squareSize
+                                                    )
+                                                }
+                                                
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                                    game.makeMove(from: selected, to: position)
+                                                    self.draggedPiece = nil
+                                                    self.selectedPosition = nil
+                                                    self.targetPosition = nil
+                                                    self.possibleMovesOpacity = 0
+                                                    self.moveOffset = .zero
+                                                    self.isMoving = false
+                                                    if settings.timePerMove > 0 {
+                                                        resetTimers()
+                                                    }
+                                                }
+                                            }
+                                        }
+                                }
+                            }
+                            
+                            ForEach(0..<8) { row in
+                                ForEach(0..<8) { col in
+                                    if let piece = game.board[row][col] {
+                                        let isSelected = selectedPosition?.row == row && selectedPosition?.col == col
+                                        
+                                        if !isSelected {
+                                            PieceView(piece: piece, size: squareSize * 0.8)
+                                                .position(
+                                                    x: CGFloat(col) * squareSize + squareSize / 2,
+                                                    y: CGFloat(row) * squareSize + squareSize / 2
+                                                )
+                                                .onTapGesture {
+                                                    if piece.color == game.currentPlayer {
+                                                        selectedPosition = Position(row: row, col: col)
+                                                        draggedPiece = piece
+                                                        dragOffset = .zero
+                                                        possibleMovesOpacity = 1
+                                                    }
+                                                }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if let draggedPiece = draggedPiece,
+                               let selectedPosition = selectedPosition {
+                                PieceView(piece: draggedPiece, size: squareSize * 0.8)
                                     .overlay(
                                         Circle()
-                                            .stroke(Color.black.opacity(0.3), lineWidth: 1)
-                                            .padding(4)
+                                            .stroke(Color.green, lineWidth: 2)
+                                            .frame(width: squareSize * 0.8, height: squareSize * 0.8)
                                     )
-                            }
-                        }
-                    }
-                }
-                .frame(height: 30)
-                .padding(.horizontal)
-                 
-                HStack {
-                    if settings.timePerMove > 0 {
-                        HStack {
-                            Text("\(formatTime(blackTimeRemaining))")
-                                .font(.system(.title2, design: .monospaced))
-                                .foregroundColor(.white)
-                                .padding(8)
-                                .background(Color.black)
-                                .cornerRadius(8)
-                                .shadow(radius: 2)
-                        }
-                        .padding(.horizontal)
-                        .padding(.bottom, -20)
-                    }
-                    Spacer()
-                }
-                
-                GeometryReader { geometry in
-                    let squareSize = min(geometry.size.width, geometry.size.height) / 8
-                    
-                    ZStack {
-                        CheckersBoard(board: game.board.map { row in
-                            row.map { piece in
-                                if let piece = piece {
-                                    return piece.color == .white ? (piece.isKing ? "WK" : "W") : (piece.isKing ? "BK" : "B")
-                                }
-                                return "."
-                            }
-                        }, squareSize: squareSize)
-                        
-                        if let target = targetPosition {
-                            Rectangle()
-                                .fill(Color.blue.opacity(0.3))
-                                .frame(width: squareSize, height: squareSize)
-                                .position(
-                                    x: CGFloat(target.col) * squareSize + squareSize / 2,
-                                    y: CGFloat(target.row) * squareSize + squareSize / 2
-                                )
-                        }
-                        
-                        if let selected = selectedPosition,
-                           let piece = game.board[selected.row][selected.col] {
-                            ForEach(Array(game.getPossibleMoves(for: piece)), id: \.self) { position in
-                                Circle()
-                                    .fill(Color.green.opacity(0.3))
-                                    .frame(width: squareSize * 0.3, height: squareSize * 0.3)
                                     .position(
-                                        x: CGFloat(position.col) * squareSize + squareSize / 2,
-                                        y: CGFloat(position.row) * squareSize + squareSize / 2
+                                        x: CGFloat(selectedPosition.col) * squareSize + squareSize / 2,
+                                        y: CGFloat(selectedPosition.row) * squareSize + squareSize / 2
                                     )
-                                    .opacity(possibleMovesOpacity)
-                                    .onTapGesture {
-                                        if game.isValidMove(from: selected, to: position) {
-                                            let rowDiff = position.row - selected.row
-                                            let colDiff = position.col - selected.col
-                                            
-                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                isMoving = true
-                                                moveOffset = CGSize(
-                                                    width: CGFloat(colDiff) * squareSize,
-                                                    height: CGFloat(rowDiff) * squareSize
-                                                )
-                                            }
-                                            
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                                game.makeMove(from: selected, to: position)
-                                                self.draggedPiece = nil
-                                                self.selectedPosition = nil
-                                                self.targetPosition = nil
-                                                self.possibleMovesOpacity = 0
-                                                self.moveOffset = .zero
-                                                self.isMoving = false
-                                                if settings.timePerMove > 0 {
-                                                    resetTimers()
+                                    .offset(isMoving ? moveOffset : dragOffset)
+                                    .gesture(
+                                        DragGesture()
+                                            .onChanged { value in
+                                                if dragOffset == .zero {
+                                                    dragOffset = value.translation
+                                                } else {
+                                                    dragOffset = value.translation
                                                 }
-                                            }
-                                        }
-                                    }
-                            }
-                        }
-                        
-                        ForEach(0..<8) { row in
-                            ForEach(0..<8) { col in
-                                if let piece = game.board[row][col] {
-                                    let isSelected = selectedPosition?.row == row && selectedPosition?.col == col
-                                    
-                                    if !isSelected {
-                                        PieceView(piece: piece, size: squareSize * 0.8)
-                                            .position(
-                                                x: CGFloat(col) * squareSize + squareSize / 2,
-                                                y: CGFloat(row) * squareSize + squareSize / 2
-                                            )
-                                            .onTapGesture {
-                                                if piece.color == game.currentPlayer {
-                                                    selectedPosition = Position(row: row, col: col)
-                                                    draggedPiece = piece
-                                                    dragOffset = .zero
-                                                    possibleMovesOpacity = 1
-                                                }
-                                            }
-                                    }
-                                }
-                            }
-                        }
-                        
-                        if let draggedPiece = draggedPiece,
-                           let selectedPosition = selectedPosition {
-                            PieceView(piece: draggedPiece, size: squareSize * 0.8)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.green, lineWidth: 2)
-                                        .frame(width: squareSize * 0.8, height: squareSize * 0.8)
-                                )
-                                .position(
-                                    x: CGFloat(selectedPosition.col) * squareSize + squareSize / 2,
-                                    y: CGFloat(selectedPosition.row) * squareSize + squareSize / 2
-                                )
-                                .offset(isMoving ? moveOffset : dragOffset)
-                                .gesture(
-                                    DragGesture()
-                                        .onChanged { value in
-                                            if dragOffset == .zero {
-                                                dragOffset = value.translation
-                                            } else {
-                                                dragOffset = value.translation
-                                            }
-                                            
-                                            let pieceCenter = CGPoint(
-                                                x: CGFloat(selectedPosition.col) * squareSize + squareSize / 2 + value.translation.width,
-                                                y: CGFloat(selectedPosition.row) * squareSize + squareSize / 2 + value.translation.height
-                                            )
-                                            
-                                            let targetCol = Int(round((pieceCenter.x - squareSize / 2) / squareSize))
-                                            let targetRow = Int(round((pieceCenter.y - squareSize / 2) / squareSize))
-                                            
-                                            if targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol < 8 {
-                                                targetPosition = Position(row: targetRow, col: targetCol)
-                                            } else {
-                                                targetPosition = nil
-                                            }
-                                        }
-                                        .onEnded { value in
-                                            let pieceCenter = CGPoint(
-                                                x: CGFloat(selectedPosition.col) * squareSize + squareSize / 2 + value.translation.width,
-                                                y: CGFloat(selectedPosition.row) * squareSize + squareSize / 2 + value.translation.height
-                                            )
-                                            
-                                            let targetCol = Int(round((pieceCenter.x - squareSize / 2) / squareSize))
-                                            let targetRow = Int(round((pieceCenter.y - squareSize / 2) / squareSize))
-                                            
-                                            if targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol < 8 {
-                                                let targetPosition = Position(row: targetRow, col: targetCol)
                                                 
-                                                let pieceOverlap = calculatePieceOverlap(
-                                                    pieceCenter: pieceCenter,
-                                                    targetSquare: CGPoint(
-                                                        x: CGFloat(targetCol) * squareSize + squareSize / 2,
-                                                        y: CGFloat(targetRow) * squareSize + squareSize / 2
-                                                    ),
-                                                    pieceSize: squareSize * 0.8,
-                                                    squareSize: squareSize
+                                                let pieceCenter = CGPoint(
+                                                    x: CGFloat(selectedPosition.col) * squareSize + squareSize / 2 + value.translation.width,
+                                                    y: CGFloat(selectedPosition.row) * squareSize + squareSize / 2 + value.translation.height
                                                 )
                                                 
-                                                if pieceOverlap >= 0.4 && game.isValidMove(from: selectedPosition, to: targetPosition) {
-                                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                        game.makeMove(from: selectedPosition, to: targetPosition)
-                                                        if settings.timePerMove > 0 {
-                                                            resetTimers()
+                                                let targetCol = Int(round((pieceCenter.x - squareSize / 2) / squareSize))
+                                                let targetRow = Int(round((pieceCenter.y - squareSize / 2) / squareSize))
+                                                
+                                                if targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol < 8 {
+                                                    targetPosition = Position(row: targetRow, col: targetCol)
+                                                } else {
+                                                    targetPosition = nil
+                                                }
+                                            }
+                                            .onEnded { value in
+                                                let pieceCenter = CGPoint(
+                                                    x: CGFloat(selectedPosition.col) * squareSize + squareSize / 2 + value.translation.width,
+                                                    y: CGFloat(selectedPosition.row) * squareSize + squareSize / 2 + value.translation.height
+                                                )
+                                                
+                                                let targetCol = Int(round((pieceCenter.x - squareSize / 2) / squareSize))
+                                                let targetRow = Int(round((pieceCenter.y - squareSize / 2) / squareSize))
+                                                
+                                                if targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol < 8 {
+                                                    let targetPosition = Position(row: targetRow, col: targetCol)
+                                                    
+                                                    let pieceOverlap = calculatePieceOverlap(
+                                                        pieceCenter: pieceCenter,
+                                                        targetSquare: CGPoint(
+                                                            x: CGFloat(targetCol) * squareSize + squareSize / 2,
+                                                            y: CGFloat(targetRow) * squareSize + squareSize / 2
+                                                        ),
+                                                        pieceSize: squareSize * 0.8,
+                                                        squareSize: squareSize
+                                                    )
+                                                    
+                                                    if pieceOverlap >= 0.4 && game.isValidMove(from: selectedPosition, to: targetPosition) {
+                                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                                            moveOffset = CGSize(
+                                                                width: CGFloat(targetCol - selectedPosition.col) * squareSize,
+                                                                height: CGFloat(targetRow - selectedPosition.row) * squareSize
+                                                            )
+                                                        }
+                                                        
+                                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                                game.makeMove(from: selectedPosition, to: targetPosition)
+                                                                if settings.timePerMove > 0 {
+                                                                    resetTimers()
+                                                                }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                            dragOffset = .zero
                                                         }
                                                     }
                                                 } else {
@@ -326,92 +343,115 @@ struct CheckersBoardView: View {
                                                         dragOffset = .zero
                                                     }
                                                 }
-                                            } else {
-                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                    dragOffset = .zero
-                                                }
+                                                
+                                                self.draggedPiece = nil
+                                                self.selectedPosition = nil
+                                                self.targetPosition = nil
+                                                self.possibleMovesOpacity = 0
                                             }
-                                            
-                                            self.draggedPiece = nil
-                                            self.selectedPosition = nil
-                                            self.targetPosition = nil
-                                            self.possibleMovesOpacity = 0
-                                        }
-                                )
-                        }
-                    }
-                }
-                .aspectRatio(1, contentMode: .fit)
-                .padding()
-                
-                HStack {
-                    if settings.timePerMove > 0 {
-                        HStack {
-                            Text("\(formatTime(whiteTimeRemaining))")
-                                .font(.system(.title2, design: .monospaced))
-                                .foregroundColor(.white)
-                                .padding(8)
-                                .background(Color.black)
-                                .cornerRadius(8)
-                                .shadow(radius: 2)
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, -20)
-                    }
-                    Spacer()
-                }
-                
-                HStack(spacing: 20) {
-                    if game.capturedBlackPieces > 0 {
-                        HStack(spacing: -10) {
-                            ForEach(0..<min(game.capturedBlackPieces, 5), id: \.self) { index in
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            gradient: Gradient(colors: [Color.black.opacity(0.8), Color.black]),
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .frame(width: 30, height: 30)
-                                    .shadow(color: .white, radius: 2, x: 0, y: 0)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                                            .padding(4)
                                     )
                             }
                         }
                     }
+                    .aspectRatio(1, contentMode: .fit)
+                    .padding()
+                    
+                    HStack {
+                        if settings.timePerMove > 0 {
+                            HStack {
+                                Text("\(formatTime(whiteTimeRemaining))")
+                                    .font(.system(.title2, design: .monospaced))
+                                    .foregroundColor(.white)
+                                    .padding(8)
+                                    .background(Color.black)
+                                    .cornerRadius(8)
+                                    .shadow(radius: 2)
+                            }
+                            .padding(.horizontal)
+                            .padding(.top, -20)
+                        }
+                        Spacer()
+                    }
+                    
+                    HStack(spacing: 20) {
+                        if game.capturedBlackPieces > 0 {
+                            HStack(spacing: -10) {
+                                ForEach(0..<min(game.capturedBlackPieces, 5), id: \.self) { index in
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                gradient: Gradient(colors: [Color.black.opacity(0.8), Color.black]),
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 30, height: 30)
+                                        .shadow(color: .white, radius: 2, x: 0, y: 0)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                                .padding(4)
+                                        )
+                                }
+                            }
+                        }
+                    }
+                    .frame(height: 30)
+                    .padding(.horizontal)
+                    
+                    Spacer()
                 }
-                .frame(height: 30)
-                .padding(.horizontal)
                 
-                Spacer()
+                if game.gameOver, let winner = game.winner {
+                    GameOverView(winner: winner, showGame: $showGame)
+                }
             }
-            
-            if game.gameOver, let winner = game.winner {
-                GameOverView(winner: winner, showGame: $showGame)
+            .alert("Exit Game", isPresented: $showExitAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Exit", role: .destructive) {
+                    game.reset()
+                    showGame = false
+                }
+            } message: {
+                Text("Are you sure you want to exit the game?")
             }
-        }
-        .alert("Exit Game", isPresented: $showExitAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Exit", role: .destructive) {
+            .onAppear {
                 game.reset()
-                showGame = false
+                if settings.timePerMove > 0 {
+                    startTimer()
+                }
+                
+                if !gameRoom.isHost {
+                    if let initialBoard = gameRoom.initialBoard {
+                        game.board = initialBoard
+                    }
+                }
             }
-        } message: {
-            Text("Are you sure you want to exit the game?")
-        }
-        .onAppear {
-            game.reset()
-            if settings.timePerMove > 0 {
-                startTimer()
+            .onChange(of: gameRoom.boardState) { newBoardState in
+                if !gameRoom.isHost {
+                    for row in 0..<8 {
+                        for col in 0..<8 {
+                            let pieceState = newBoardState[row][col]
+                            if pieceState != "." {
+                                let color: PieceColor = pieceState.hasPrefix("W") ? .white : .black
+                                let isKing = pieceState.hasSuffix("K")
+                                game.board[row][col] = Piece(color: color, type: isKing ? .king : .normal, position: Position(row: row, col: col))
+                            } else {
+                                game.board[row][col] = nil
+                            }
+                        }
+                    }
+                }
             }
-        }
-        .onDisappear {
-            timer?.invalidate()
-            timer = nil
+            .onChange(of: gameRoom.currentPlayer) { newPlayer in
+                if !gameRoom.isHost {
+                    game.currentPlayer = newPlayer == "White" ? .white : .black
+                }
+            }
+            .onDisappear {
+                timer?.invalidate()
+                timer = nil
+            }
         }
     }
     
@@ -526,6 +566,7 @@ struct PieceView: View {
             timePerMove: 30,
             boardStyle: 0
         ),
-        showGame: .constant(true)
+        showGame: .constant(true),
+        gameRoom: GameRoom()
     )
 } 
