@@ -301,15 +301,11 @@ struct CheckersBoardView: View {
                                         x: CGFloat(displayCol) * squareSize + squareSize / 2,
                                         y: CGFloat(displayRow) * squareSize + squareSize / 2
                                     )
-                                    .offset(isMoving ? moveOffset : dragOffset)
+                                    .offset(dragOffset)
                                     .gesture(
                                         DragGesture()
                                             .onChanged { value in
-                                                if dragOffset == .zero {
-                                                    dragOffset = value.translation
-                                                } else {
-                                                    dragOffset = value.translation
-                                                }
+                                                dragOffset = value.translation
                                                 
                                                 let pieceCenter = CGPoint(
                                                     x: CGFloat(displayCol) * squareSize + squareSize / 2 + value.translation.width,
@@ -354,36 +350,29 @@ struct CheckersBoardView: View {
                                                     )
                                                     
                                                     if pieceOverlap >= 0.4 && game.isValidMove(from: selectedPosition, to: targetPosition) {
-                                                        withAnimation(.easeInOut(duration: 0.3)) {
-                                                            moveOffset = CGSize(
-                                                                width: CGFloat(actualTargetCol - selectedPosition.col) * squareSize,
-                                                                height: CGFloat(actualTargetRow - selectedPosition.row) * squareSize
-                                                            )
+                                                        game.makeMove(from: selectedPosition, to: targetPosition)
+                                                        if settings.timePerMove > 0 {
+                                                            resetTimers()
                                                         }
-                                                        
-                                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                                game.makeMove(from: selectedPosition, to: targetPosition)
-                                                                if settings.timePerMove > 0 {
-                                                                    resetTimers()
-                                                                }
-                                                            }
-                                                        }
+                                                        self.draggedPiece = nil
+                                                        self.selectedPosition = nil
+                                                        self.targetPosition = nil
+                                                        self.possibleMovesOpacity = 0
+                                                        self.dragOffset = .zero
                                                     } else {
-                                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                            dragOffset = .zero
-                                                        }
+                                                        self.dragOffset = .zero
+                                                        self.draggedPiece = nil
+                                                        self.selectedPosition = nil
+                                                        self.targetPosition = nil
+                                                        self.possibleMovesOpacity = 0
                                                     }
                                                 } else {
-                                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                        dragOffset = .zero
-                                                    }
+                                                    self.dragOffset = .zero
+                                                    self.draggedPiece = nil
+                                                    self.selectedPosition = nil
+                                                    self.targetPosition = nil
+                                                    self.possibleMovesOpacity = 0
                                                 }
-                                                
-                                                self.draggedPiece = nil
-                                                self.selectedPosition = nil
-                                                self.targetPosition = nil
-                                                self.possibleMovesOpacity = 0
                                             }
                                     )
                             }
