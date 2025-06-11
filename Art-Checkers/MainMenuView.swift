@@ -2,10 +2,10 @@ import SwiftUI
 
 struct MainMenuView: View {
     @State private var showNewGameSheet = false
-    @State private var showAvailableRooms = false
+    @EnvironmentObject var gameRoom: GameRoom
     @Binding var showGame: Bool
     @Binding var gameSettings: GameSettings?
-    @StateObject private var gameRoom = GameRoom.shared
+    @State private var showCounterView = false
     
     var body: some View {
         NavigationView {
@@ -15,10 +15,10 @@ struct MainMenuView: View {
                     .fontWeight(.bold)
                     .padding(.bottom, 40)
                 
-                Button(action: {
+                Button {
                     showNewGameSheet = true
-                }) {
-                    Text("Create New Room")
+                } label: {
+                    Text("New Game")
                         .font(.title2)
                         .foregroundColor(.white)
                         .frame(width: 250, height: 50)
@@ -26,34 +26,30 @@ struct MainMenuView: View {
                         .cornerRadius(10)
                 }
                 
-                Button(action: {
-                    showAvailableRooms = true
-                }) {
-                    Text("Join Room")
+                Button {
+                    gameRoom.startBrowsing()
+                } label: {
+                    Text("Connect to room")
                         .font(.title2)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.white)
                         .frame(width: 250, height: 50)
                         .background(Color.green)
-                        .cornerRadius(10)
-                }
-                
-                Button(action: {
-                    // TODO: Join random room
-                }) {
-                    Text("Join Random Room")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .frame(width: 250, height: 50)
-                        .background(Color.orange)
                         .cornerRadius(10)
                 }
             }
             .padding()
             .sheet(isPresented: $showNewGameSheet) {
-                NewGameView(showGame: $showGame, gameSettings: $gameSettings, gameRoom: gameRoom)
+                NewGameView(showGame: $showGame, gameSettings: $gameSettings)
+                    .environmentObject(gameRoom)
             }
-            .sheet(isPresented: $showAvailableRooms) {
-                AvailableRoomsView(showGame: $showGame, gameSettings: $gameSettings, gameRoom: gameRoom)
+            .onChange(of: gameRoom.connectedPeers.isEmpty) { isEmpty in
+                if !isEmpty {
+                    showCounterView = true
+                }
+            }
+            .sheet(isPresented: $showCounterView) {
+                CounterView()
+                    .environmentObject(gameRoom)
             }
         }
     }
@@ -66,7 +62,7 @@ struct NewGameView: View {
     @State private var showBoardStylePicker = false
     @Binding var showGame: Bool
     @Binding var gameSettings: GameSettings?
-    @ObservedObject var gameRoom: GameRoom
+    @EnvironmentObject var gameRoom: GameRoom
     
     private let boardStyles = [
         (name: "Classic Brown", colors: (Color(red: 0.6, green: 0.4, blue: 0.2), Color(red: 0.9, green: 0.7, blue: 0.5))),
@@ -152,10 +148,6 @@ struct NewGameView: View {
             Spacer()
 
             Button(action: {
-                print("🎮 NewGameView: Creating new game room")
-                print("🎮 NewGameView: Selected board style: \(boardStyles[selectedBoardStyle].name)")
-                print("🎮 NewGameView: Time per move: \(Int(timePerMove)) seconds")
-                
                 let settings = GameSettings(
                     playerColor: .white,
                     timerMode: timePerMove > 0 ? .timePerMove : .noLimit,
@@ -163,14 +155,8 @@ struct NewGameView: View {
                     boardStyle: selectedBoardStyle
                 )
                 
-                print("🎮 NewGameView: Starting game room with settings:")
-                print("  - Player Color: \(settings.playerColor)")
-                print("  - Timer Mode: \(settings.timerMode)")
-                print("  - Time Per Move: \(settings.timePerMove)")
-                print("  - Board Style: \(settings.boardStyle)")
-                
-                gameRoom.startHosting(settings: settings)
                 gameSettings = settings
+                gameRoom.startHosting()
                 showGame = true
                 dismiss()
             }) {
@@ -195,12 +181,6 @@ struct NewGameView: View {
             }
             .padding(.horizontal)
             .padding(.bottom, 30)
-            
-            if !gameRoom.statusMessage.isEmpty {
-                Text(gameRoom.statusMessage)
-                    .foregroundColor(.gray)
-                    .padding(.bottom, 10)
-            }
         }
         .sheet(isPresented: $showBoardStylePicker) {
             BoardStylePickerView(selectedStyle: $selectedBoardStyle)
@@ -300,7 +280,6 @@ struct BoardStylePickerView: View {
                                 style: boardStyles[index],
                                 isSelected: selectedStyle == index,
                                 action: {
-                                    print("🎨 BoardStylePickerView: Selected board style: \(boardStyles[index].name)")
                                     selectedStyle = index
                                     UserDefaultsManager.shared.saveSelectedBoardStyle(index)
                                 }
@@ -312,7 +291,6 @@ struct BoardStylePickerView: View {
             }
             .navigationBarItems(
                 trailing: Button(action: {
-                    print("🎨 BoardStylePickerView: Done selecting board style")
                     dismiss()
                 }) {
                     Text("Done")
@@ -324,128 +302,51 @@ struct BoardStylePickerView: View {
     }
 }
 
-struct AvailableRoomsView: View {
+struct CounterView: View {
     @Environment(\.dismiss) var dismiss
-    @Binding var showGame: Bool
-    @Binding var gameSettings: GameSettings?
-    @ObservedObject var gameRoom: GameRoom
-    @State private var isSearching = false
-    @State private var searchStartTime = Date()
+    @EnvironmentObject var gameRoom: GameRoom
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                VStack(spacing: 8) {
-                    Text("Available Rooms")
-                        .font(.system(size: 32, weight: .bold))
-                        .foregroundColor(.gray)
-                    Text("Select a room to join")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.gray.opacity(0.7))
-                }
-                .padding(.top, 40)
-                .padding(.bottom, 40)
-                
-                if isSearching {
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                        Text("Searching for rooms...")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.gray)
-                        Text("Search time: \(Int(Date().timeIntervalSince(searchStartTime)))s")
-                            .font(.system(size: 14))
-                            .foregroundColor(.gray.opacity(0.7))
-                    }
-                    .frame(maxHeight: .infinity)
-                } else if gameRoom.connectedPeers.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "wifi.slash")
-                            .font(.system(size: 50))
-                            .foregroundColor(.gray)
-                        Text("No rooms available")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.gray)
-                        Button(action: {
-                            startSearch()
-                        }) {
-                            Text("Search Again")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 12)
-                                .background(Color.blue)
-                                .cornerRadius(8)
-                        }
-                    }
-                    .frame(maxHeight: .infinity)
-                } else {
-                    List {
-                        ForEach(gameRoom.connectedPeers, id: \.self) { peer in
-                            Button(action: {
-                                if let settings = gameRoom.gameSettings {
-                                    gameSettings = settings
-                                    showGame = true
-                                    dismiss()
-                                }
-                            }) {
-                                HStack {
-                                    Image(systemName: "person.circle.fill")
-                                        .font(.system(size: 24))
-                                        .foregroundColor(.gray)
-                                    
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(peer.displayName)
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.gray)
-                                        Text("Tap to join")
-                                            .font(.system(size: 14))
-                                            .foregroundColor(.gray.opacity(0.7))
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.gray.opacity(0.7))
-                                }
-                                .padding(.vertical, 8)
-                            }
-                        }
-                    }
-                    .listStyle(PlainListStyle())
-                }
-            }
-            .navigationBarItems(
-                trailing: Button(action: {
-                    dismiss()
+        VStack {
+            Text(gameRoom.statusMessage)
+                .foregroundColor(.gray)
+                .padding(.top)
+            
+            // Верхний счетчик (управляется подключенным пользователем)
+            VStack {
+                Text("Счетчик игрока 2")
+                    .font(.headline)
+                Text("\(gameRoom.counter2)")
+                    .font(.system(size: 40, weight: .bold))
+                Button(action: {
+                    gameRoom.incrementCounter2()
                 }) {
-                    Text("Done")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.gray)
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(.blue)
                 }
-            )
-        }
-        .onAppear {
-            startSearch()
-        }
-        .onDisappear {
-            print("🎮 AvailableRoomsView: View disappeared, stopping search")
-            gameRoom.stopBrowsing()
-        }
-    }
-    
-    private func startSearch() {
-        print("🎮 AvailableRoomsView: Starting room search")
-        isSearching = true
-        searchStartTime = Date()
-        gameRoom.startBrowsing()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-            if isSearching {
-                print("🎮 AvailableRoomsView: Search timeout reached")
-                isSearching = false
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.gray.opacity(0.1))
+            
+            Divider()
+            
+            // Нижний счетчик (управляется хостом)
+            VStack {
+                Text("Счетчик игрока 1")
+                    .font(.headline)
+                Text("\(gameRoom.counter1)")
+                    .font(.system(size: 40, weight: .bold))
+                Button(action: {
+                    gameRoom.incrementCounter1()
+                }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(.blue)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.gray.opacity(0.1))
         }
     }
 }

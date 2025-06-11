@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var dragOffset: CGSize = .zero
     @State private var showGame = false
     @State private var gameSettings: GameSettings?
+    @StateObject private var gameRoom = GameRoom()
     
     var body: some View {
         if showGame, let settings = gameSettings {
@@ -27,6 +28,7 @@ struct ContentView: View {
             )
         } else {
             MainMenuView(showGame: $showGame, gameSettings: $gameSettings)
+                .environmentObject(gameRoom)
         }
     }
 }

@@ -8,6 +8,10 @@
 		<string>_checkers-game._udp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>This app needs access to the local network to find and connect to other players.</string>
+	<string>Приложению требуется доступ к локальной сети для поиска других игроков</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Приложению требуется Bluetooth для поиска других игроков поблизости</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Приложению требуется Bluetooth для поиска других игроков поблизости</string>
 </dict>
 </plist>
