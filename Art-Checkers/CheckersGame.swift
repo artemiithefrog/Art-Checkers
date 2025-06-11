@@ -5,20 +5,24 @@ enum PieceColor: String, Codable {
     case black
 }
 
-enum PieceType {
+enum PieceType: String, Codable {
     case normal
     case king
 }
 
-struct Piece: Identifiable {
+struct Piece: Identifiable, Codable {
     let id = UUID()
     var color: PieceColor
     var type: PieceType
     var position: Position
     var isKing: Bool = false
+    
+    enum CodingKeys: String, CodingKey {
+        case id, color, type, position, isKing
+    }
 }
 
-struct Position: Hashable {
+struct Position: Hashable, Codable {
     var row: Int
     var col: Int
 }
@@ -278,6 +282,7 @@ class CheckersGame: ObservableObject {
             
             currentPlayer = currentPlayer == .white ? .black : .white
             gameRoom?.playerChanged(currentPlayer: currentPlayer == .white ? "White" : "Black")
+            gameRoom?.sendBoardState(board)
             checkGameOver()
         }
     }

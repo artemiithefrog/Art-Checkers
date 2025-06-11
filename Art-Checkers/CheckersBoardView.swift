@@ -1,5 +1,70 @@
 import SwiftUI
 
+struct CheckersBoard: View {
+    let board: [[String]]
+    let squareSize: CGFloat
+    
+    var body: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                ForEach(0..<8) { row in
+                    HStack(spacing: 0) {
+                        ForEach(0..<8) { col in
+                            Rectangle()
+                                .fill((row + col) % 2 == 0 ? Color.gray.opacity(0.3) : Color.gray.opacity(0.1))
+                                .frame(width: squareSize, height: squareSize)
+                        }
+                    }
+                }
+            }
+            
+            ForEach(0..<8) { row in
+                ForEach(0..<8) { col in
+                    if board[row][col] != "." {
+                        let piece = board[row][col]
+                        let position = CGPoint(
+                            x: CGFloat(col) * squareSize + squareSize / 2,
+                            y: CGFloat(row) * squareSize + squareSize / 2
+                        )
+                        
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        piece.hasPrefix("W") ? Color.white : Color.black.opacity(0.8),
+                                        piece.hasPrefix("W") ? Color.white.opacity(0.8) : Color.black
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: squareSize * 0.8, height: squareSize * 0.8)
+                            .shadow(radius: 2)
+                            .overlay(
+                                Circle()
+                                    .stroke(
+                                        piece.hasPrefix("W") ? Color.black.opacity(0.3) : Color.white.opacity(0.3),
+                                        lineWidth: 1
+                                    )
+                                    .padding(squareSize * 0.15)
+                            )
+                            .overlay(
+                                Group {
+                                    if piece.hasSuffix("K") {
+                                        Image(systemName: "crown.fill")
+                                            .foregroundColor(piece.hasPrefix("W") ? .black : .white)
+                                            .font(.system(size: squareSize * 0.4))
+                                    }
+                                }
+                            )
+                            .position(position)
+                    }
+                }
+            }
+        }
+    }
+}
+
 struct CheckersBoardView: View {
     @ObservedObject var game: CheckersGame
     @Binding var selectedPosition: Position?
@@ -107,17 +172,14 @@ struct CheckersBoardView: View {
                     let squareSize = min(geometry.size.width, geometry.size.height) / 8
                     
                     ZStack {
-                        VStack(spacing: 0) {
-                            ForEach(0..<8) { row in
-                                HStack(spacing: 0) {
-                                    ForEach(0..<8) { col in
-                                        Rectangle()
-                                            .fill((row + col) % 2 == 0 ? getLightColor() : getDarkColor())
-                                            .frame(width: squareSize, height: squareSize)
-                                    }
+                        CheckersBoard(board: game.board.map { row in
+                            row.map { piece in
+                                if let piece = piece {
+                                    return piece.color == .white ? (piece.isKing ? "WK" : "W") : (piece.isKing ? "BK" : "B")
                                 }
+                                return "."
                             }
-                        }
+                        }, squareSize: squareSize)
                         
                         if let target = targetPosition {
                             Rectangle()
@@ -351,34 +413,6 @@ struct CheckersBoardView: View {
             timer?.invalidate()
             timer = nil
         }
-    }
-    
-    private func getLightColor() -> Color {
-        let styles: [(light: Color, dark: Color)] = [
-            (Color.brown.opacity(0.3), Color.brown.opacity(0.7)),
-            (Color.green.opacity(0.3), Color.green.opacity(0.7)),
-            (Color.blue.opacity(0.3), Color.blue.opacity(0.7)),
-            (Color.gray.opacity(0.3), Color.gray.opacity(0.7)),
-            (Color.purple.opacity(0.3), Color.purple.opacity(0.7)),
-            (Color.orange.opacity(0.3), Color.orange.opacity(0.7)),
-            (Color.red.opacity(0.3), Color.red.opacity(0.7)),
-            (Color(red: 0.4, green: 0.8, blue: 0.6).opacity(0.3), Color(red: 0.4, green: 0.8, blue: 0.6).opacity(0.7))
-        ]
-        return styles[settings.boardStyle].light
-    }
-    
-    private func getDarkColor() -> Color {
-        let styles: [(light: Color, dark: Color)] = [
-            (Color.brown.opacity(0.3), Color.brown.opacity(0.7)),
-            (Color.green.opacity(0.3), Color.green.opacity(0.7)),
-            (Color.blue.opacity(0.3), Color.blue.opacity(0.7)),
-            (Color.gray.opacity(0.3), Color.gray.opacity(0.7)),
-            (Color.purple.opacity(0.3), Color.purple.opacity(0.7)),
-            (Color.orange.opacity(0.3), Color.orange.opacity(0.7)),
-            (Color.red.opacity(0.3), Color.red.opacity(0.7)),
-            (Color(red: 0.4, green: 0.8, blue: 0.6).opacity(0.3), Color(red: 0.4, green: 0.8, blue: 0.6).opacity(0.7))
-        ]
-        return styles[settings.boardStyle].dark
     }
     
     private func calculatePieceOverlap(pieceCenter: CGPoint, targetSquare: CGPoint, pieceSize: CGFloat, squareSize: CGFloat) -> CGFloat {

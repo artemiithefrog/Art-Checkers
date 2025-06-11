@@ -303,16 +303,56 @@ struct BoardStylePickerView: View {
 }
 
 struct CounterView: View {
-    @Environment(\.dismiss) var dismiss
     @EnvironmentObject var gameRoom: GameRoom
+    @State private var previousBoardState: [[String]] = Array(repeating: Array(repeating: ".", count: 8), count: 8)
+    @State private var piecePositions: [String: CGPoint] = [:]
     
     var body: some View {
-        VStack {
-            Text(gameRoom.statusMessage)
-                .foregroundColor(.gray)
-                .padding(.top)
-            
-            Text("current player color: \(gameRoom.currentPlayer)")
+        ZStack {
+            VStack {
+                HStack {
+                    Spacer()
+                    
+                    Text("Current Player: \(gameRoom.currentPlayer)")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    Spacer()
+                    
+                    Color.clear
+                        .frame(width: 40, height: 40)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+
+                Spacer()
+                
+                GeometryReader { geometry in
+                    let squareSize = min(geometry.size.width, geometry.size.height) / 8
+                    
+                    CheckersBoard(board: gameRoom.boardState, squareSize: squareSize)
+                        .onChange(of: gameRoom.boardState) { newState in
+                            for row in 0..<8 {
+                                for col in 0..<8 {
+                                    let piece = newState[row][col]
+                                    if piece != "." {
+                                        let position = CGPoint(
+                                            x: CGFloat(col) * squareSize + squareSize / 2,
+                                            y: CGFloat(row) * squareSize + squareSize / 2
+                                        )
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            piecePositions[piece] = position
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                }
+                .aspectRatio(1, contentMode: .fit)
+                .padding()
+                
+                Spacer()
+            }
         }
     }
 }

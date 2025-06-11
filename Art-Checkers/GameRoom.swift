@@ -15,6 +15,8 @@ class GameRoom: NSObject, ObservableObject {
     @Published var isHost: Bool = false
     @Published var connectedPeers: [MCPeerID] = []
     @Published var statusMessage: String = ""
+    @Published var boardState: [[String]] = Array(repeating: Array(repeating: ".", count: 8), count: 8)
+    @Published var initialBoard: [[Piece?]]?
     
     private var session: MCSession?
     private var advertiser: MCNearbyServiceAdvertiser?
@@ -27,6 +29,7 @@ class GameRoom: NSObject, ObservableObject {
         super.init()
         print("GameRoom: Инициализация GameRoom")
         setupSession()
+        setupInitialBoardState()
     }
     
     private func setupSession() {
@@ -34,6 +37,21 @@ class GameRoom: NSObject, ObservableObject {
         session?.delegate = self
         statusMessage = "Сессия создана"
         print("GameRoom: Сессия создана для \(myPeerId.displayName)")
+    }
+    
+    private func setupInitialBoardState() {
+        // Заполняем начальное расположение шашек
+        for row in 0..<8 {
+            for col in 0..<8 {
+                if (row + col) % 2 == 1 { // Только на черных клетках
+                    if row < 3 {
+                        boardState[row][col] = "B" // Черные шашки внизу
+                    } else if row > 4 {
+                        boardState[row][col] = "W" // Белые шашки вверху
+                    }
+                }
+            }
+        }
     }
     
     func startHosting() {
@@ -55,6 +73,29 @@ class GameRoom: NSObject, ObservableObject {
         print("GameRoom: Ищу сервис типа: \(serviceType)")
     }
     
+    func sendInitialBoard(_ board: [[Piece?]]) {
+        guard let session = session else { return }
+        let boardData = try? JSONEncoder().encode(["initialBoard": board])
+        try? session.send(boardData ?? Data(), toPeers: session.connectedPeers, with: .reliable)
+        print("GameRoom: Отправлено начальное положение шашек")
+    }
+    
+    func sendBoardState(_ board: [[Piece?]]) {
+        guard let session = session else { return }
+        var boardState: [[String]] = Array(repeating: Array(repeating: ".", count: 8), count: 8)
+        
+        for row in 0..<8 {
+            for col in 0..<8 {
+                if let piece = board[row][col] {
+                    boardState[row][col] = piece.color == .white ? (piece.isKing ? "WK" : "W") : (piece.isKing ? "BK" : "B")
+                }
+            }
+        }
+        
+        let data = try? JSONEncoder().encode(["boardState": boardState])
+        try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
+    }
+    
     func incrementCounter1() {
         counter1 += 1
         print("GameRoom: Увеличен счетчик 1 до \(counter1)")
@@ -74,7 +115,6 @@ class GameRoom: NSObject, ObservableObject {
     
     private func sendCounterUpdate() {
         guard let session = session else { return }
-//        let data = try? JSONEncoder().encode(["counter1": counter1, "counter2": counter2])
         let data = try? JSONEncoder().encode(["currentPlayer": currentPlayer])
         try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
         print("GameRoom: Отправлено обновление цвета: \(currentPlayer)")
@@ -110,6 +150,22 @@ extension GameRoom: MCSessionDelegate {
             DispatchQueue.main.async {
                 self.currentPlayer = player
                 print("GameRoom: Получено обновление цвета от \(peerID.displayName) - \(player)")
+            }
+        } else if let boardData = try? JSONDecoder().decode([String: [[String]]].self, from: data),
+                  let boardState = boardData["boardState"] {
+            DispatchQueue.main.async {
+                self.boardState = boardState
+                print("\nGameRoom: Текущее положение шашек:")
+                for row in boardState {
+                    print(row.joined(separator: " "))
+                }
+                print("")
+            }
+        } else if let boardData = try? JSONDecoder().decode([String: [[Piece?]]].self, from: data),
+                  let board = boardData["initialBoard"] {
+            DispatchQueue.main.async {
+                self.initialBoard = board
+                print("GameRoom: Получено начальное положение шашек от \(peerID.displayName)")
             }
         }
     }
