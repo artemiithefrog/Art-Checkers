@@ -4,6 +4,7 @@ import SwiftUI
 
 class MultiplayerManager: NSObject, ObservableObject {
     @Published var connectedPeers: [MCPeerID] = []
+    @Published var foundPeers: [MCPeerID] = []
     @Published var statusMessage: String = ""
     @Published var isHost: Bool = false
     @Published var totalPieces: Int = 24
@@ -65,18 +66,19 @@ extension MultiplayerManager: MCSessionDelegate {
         DispatchQueue.main.async {
             switch state {
             case .connected:
-                print("🎮 MultiplayerManager: Peer connected: \(peerID.displayName)")
                 if !self.connectedPeers.contains(peerID) {
+                    print("🎮 MultiplayerManager: Peer connected: \(peerID.displayName)")
                     self.connectedPeers.append(peerID)
-                    self.statusMessage = "Подключено к \(peerID.displayName)"
+                    self.foundPeers.removeAll { $0 == peerID }
+                    self.statusMessage = "Connected to \(peerID.displayName)"
                 }
             case .notConnected:
                 print("🎮 MultiplayerManager: Peer disconnected: \(peerID.displayName)")
                 self.connectedPeers.removeAll { $0 == peerID }
-                self.statusMessage = "Отключено от \(peerID.displayName)"
+                self.statusMessage = "Disconnected from \(peerID.displayName)"
             case .connecting:
                 print("🎮 MultiplayerManager: Connecting to peer: \(peerID.displayName)")
-                self.statusMessage = "Подключение к \(peerID.displayName)..."
+                self.statusMessage = "Connecting to \(peerID.displayName)..."
             @unknown default:
                 break
             }
@@ -127,15 +129,19 @@ extension MultiplayerManager: MCNearbyServiceBrowserDelegate {
     func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
         print("🎮 MultiplayerManager: Found room: \(peerID.displayName)")
         DispatchQueue.main.async {
-            self.statusMessage = "Найдена комната: \(peerID.displayName)"
+            self.statusMessage = "Found room: \(peerID.displayName)"
+            if !self.foundPeers.contains(peerID) {
+                self.foundPeers.append(peerID)
+            }
         }
-        browser.invitePeer(peerID, to: session!, withContext: nil, timeout: 30)
+        browser.invitePeer(peerID, to: session!, withContext: nil, timeout: 10)
     }
     
     func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
         print("🎮 MultiplayerManager: Room unavailable: \(peerID.displayName)")
         DispatchQueue.main.async {
-            self.statusMessage = "Комната недоступна: \(peerID.displayName)"
+            self.statusMessage = "Room unavailable: \(peerID.displayName)"
+            self.foundPeers.removeAll { $0 == peerID }
         }
     }
     

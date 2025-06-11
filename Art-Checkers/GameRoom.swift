@@ -6,6 +6,7 @@ class GameRoom: NSObject, ObservableObject {
     
     @Published var isHost: Bool = false
     @Published var connectedPeers: [MCPeerID] = []
+    @Published var foundPeers: [MCPeerID] = []
     @Published var statusMessage: String = ""
     @Published var gameSettings: GameSettings?
     @Published var isSearching: Bool = false
@@ -66,6 +67,12 @@ class GameRoom: NSObject, ObservableObject {
         browser?.delegate = self
         browser?.startBrowsingForPeers()
         
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            guard let self = self, self.isSearching else { return }
+            self.browser?.stopBrowsingForPeers()
+            self.browser?.startBrowsingForPeers()
+        }
+        
         print("🎮 GameRoom: Started browsing for peers")
         statusMessage = "Searching..."
     }
@@ -98,6 +105,7 @@ class GameRoom: NSObject, ObservableObject {
         
         session?.disconnect()
         connectedPeers.removeAll()
+        foundPeers.removeAll()
         print("🎮 GameRoom: Cleanup complete")
     }
     
@@ -119,6 +127,7 @@ extension GameRoom: MCSessionDelegate {
                 if !self.connectedPeers.contains(peerID) {
                     print("🎮 GameRoom: Peer connected: \(peerID.displayName)")
                     self.connectedPeers.append(peerID)
+                    self.foundPeers.removeAll { $0 == peerID }
                     self.statusMessage = "Connected to \(peerID.displayName)"
                     if self.isHost {
                         print("🎮 GameRoom: Sending game settings to new peer")
@@ -182,15 +191,18 @@ extension GameRoom: MCNearbyServiceBrowserDelegate {
         print("🎮 GameRoom: Found room: \(peerID.displayName)")
         DispatchQueue.main.async {
             self.statusMessage = "Found room: \(peerID.displayName)"
-            self.isSearching = false
+            if !self.foundPeers.contains(peerID) {
+                self.foundPeers.append(peerID)
+            }
         }
-        browser.invitePeer(peerID, to: session!, withContext: nil, timeout: 30)
+        browser.invitePeer(peerID, to: session!, withContext: nil, timeout: 10)
     }
     
     func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
         print("🎮 GameRoom: Room unavailable: \(peerID.displayName)")
         DispatchQueue.main.async {
             self.statusMessage = "Room unavailable: \(peerID.displayName)"
+            self.foundPeers.removeAll { $0 == peerID }
         }
     }
     
