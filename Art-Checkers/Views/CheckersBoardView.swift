@@ -405,13 +405,10 @@ struct CheckersBoardView: View {
                             isDraw: true
                         )
                     } else if let winner = game.winner {
-                        let reason = !game.hasAnyValidMoves(for: winner == .white ? .black : .white) 
-                            ? "\(winner == .white ? "Black" : "White") pieces are blocked" 
-                            : "\(winner == .white ? "Black" : "White") pieces are captured"
                         GameOverView(
                             winner: winner,
                             showGame: $showGame,
-                            reason: reason,
+                            reason: endgameReason(winner: winner),
                             isDraw: false
                         )
                     }
@@ -514,6 +511,18 @@ struct CheckersBoardView: View {
                 timer = nil
                 NotificationCenter.default.removeObserver(self)
             }
+        }
+    }
+    
+    func endgameReason(winner: PieceColor) -> String {
+        if whiteTimeRemaining <= 0 {
+            return "White player ran out of time"
+        } else if blackTimeRemaining <= 0 {
+            return "Black player ran out of time"
+        } else if !game.hasAnyValidMoves(for: winner == .white ? .black : .white) {
+            return "\(winner == .white ? "Black" : "White") pieces are blocked"
+        } else {
+            return "\(winner == .white ? "Black" : "White") pieces are captured"
         }
     }
 }

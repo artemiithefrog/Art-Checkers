@@ -48,37 +48,40 @@ struct GameOverView: View {
                     
                     if !reason.isEmpty {
                         Text(reason)
-                            .font(.system(size: 18))
+                            .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.white.opacity(0.8))
                             .multilineTextAlignment(.center)
-                            .padding(.horizontal)
+                            .padding(.horizontal, 20)
                     }
                 }
                 
-                HStack(spacing: 20) {
-                    Button(action: {
-                        showGame = false
-                    }) {
-                        Text("Main Menu")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 30)
-                            .padding(.vertical, 15)
-                            .background(Color.blue)
-                            .cornerRadius(10)
-                    }
+                Button {
+                    showGame = false
+                } label: {
+                    Text("Back to Menu")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 40)
+                        .padding(.vertical, 15)
+                        .background(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(red: 0.3, green: 0.8, blue: 0.6),
+                                    Color(red: 0.3, green: 0.8, blue: 0.6).opacity(0.8)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             }
-            .padding(40)
+            .padding(30)
             .background(
                 RoundedRectangle(cornerRadius: 25)
-                    .fill(Color.gray.opacity(0.3))
-                    .background(
-                        RoundedRectangle(cornerRadius: 25)
-                            .fill(.ultraThinMaterial)
-                    )
+                    .fill(Color(red: 0.1, green: 0.1, blue: 0.1))
             )
-            .padding(40)
+            .padding(.horizontal, 40)
         }
     }
 } 
