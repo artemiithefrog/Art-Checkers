@@ -38,6 +38,7 @@ struct CheckersBoardView: View {
         
         movingPiece = (piece: piece, from: from, to: to)
         moveProgress = 0
+        game.board[from.row][from.col] = nil
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -46,10 +47,26 @@ struct CheckersBoardView: View {
         }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            game.makeMove(from: from, to: to)
+            var updatedPiece = piece
+            updatedPiece.position = to
+            
+            if (piece.color == .white && to.row == 0) || (piece.color == .black && to.row == 7) {
+                updatedPiece.type = .king
+                updatedPiece.isKing = true
+            }
+            
+            game.board[to.row][to.col] = updatedPiece
+            
             if settings.timePerMove > 0 {
                 resetTimers()
             }
+            
+            if let gameRoom = game.gameRoom {
+                gameRoom.sendBoardState(game.board)
+                gameRoom.playerChanged(currentPlayer: game.currentPlayer == .white ? "White" : "Black")
+            }
+            
+            game.currentPlayer = game.currentPlayer == .white ? .black : .white
             movingPiece = nil
             moveProgress = 0
             draggedPiece = nil
@@ -222,8 +239,9 @@ struct CheckersBoardView: View {
                                         let displayCol = gameRoom.isHost ? col : 7 - col
                                         
                                         let isMoving = movingPiece?.from.row == row && movingPiece?.from.col == col
+                                        let isOpponentMoving = opponentMove?.from.row == row && opponentMove?.from.col == col
                                         
-                                        if !isMoving {
+                                        if !isMoving && !isOpponentMoving {
                                             PieceView(piece: piece, size: squareSize * 0.8)
                                                 .overlay(
                                                     isSelected ? Circle()
@@ -415,6 +433,7 @@ struct CheckersBoardView: View {
                 if let from = fromPosition, let to = toPosition, let piece = movedPiece {
                     opponentMove = (piece: piece, from: from, to: to)
                     opponentMoveProgress = 0
+                    game.board[from.row][from.col] = nil
                     
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
