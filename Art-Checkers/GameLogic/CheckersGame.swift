@@ -212,8 +212,14 @@ class CheckersGame: ObservableObject {
                 board[capturedRow][capturedCol] = nil
                 if capturedPiece.color == .white {
                     capturedWhitePieces += 1
+                    if let gameRoom = gameRoom {
+                        gameRoom.capturedWhitePieces = capturedWhitePieces
+                    }
                 } else {
                     capturedBlackPieces += 1
+                    if let gameRoom = gameRoom {
+                        gameRoom.capturedBlackPieces = capturedBlackPieces
+                    }
                 }
             }
             
@@ -267,7 +273,7 @@ class CheckersGame: ObservableObject {
         capturedBlackPieces = 0
     }
     
-    private func checkGameOver() {
+    func checkGameOver() {
         var whitePieces = 0
         var blackPieces = 0
         var whiteCanMove = false
@@ -323,12 +329,35 @@ class CheckersGame: ObservableObject {
             for col in 0..<8 {
                 if let piece = board[row][col], piece.color == color {
                     let position = Position(row: row, col: col)
-                    if !getPossibleMoves(for: piece).isEmpty {
+                    if hasCaptureMovesForPiece(piece, from: position) {
                         return true
                     }
                 }
             }
         }
+
+        for row in 0..<8 {
+            for col in 0..<8 {
+                if let piece = board[row][col], piece.color == color {
+                    let position = Position(row: row, col: col)
+                    let directions = piece.type == .king ? [-1, 1] : [piece.color == .white ? -1 : 1]
+                    
+                    for rowDir in directions {
+                        for colDir in [-1, 1] {
+                            let newRow = position.row + rowDir
+                            let newCol = position.col + colDir
+                            
+                            if newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8 {
+                                if board[newRow][newCol] == nil {
+                                    return true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         return false
     }
     

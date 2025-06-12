@@ -44,7 +44,39 @@ struct CheckersBoardView: View {
         if abs(rowDiff) == 2 && abs(colDiff) == 2 {
             let capturedRow = (from.row + to.row) / 2
             let capturedCol = (from.col + to.col) / 2
-            game.board[capturedRow][capturedCol] = nil
+            
+            if let capturedPiece = game.board[capturedRow][capturedCol] {
+                if capturedPiece.color == .white {
+                    game.capturedWhitePieces += 1
+                    if let gameRoom = game.gameRoom {
+                        gameRoom.capturedWhitePieces = game.capturedWhitePieces
+                    }
+                } else {
+                    game.capturedBlackPieces += 1
+                    if let gameRoom = game.gameRoom {
+                        gameRoom.capturedBlackPieces = game.capturedBlackPieces
+                    }
+                }
+            }
+            
+                if let capturedPiece = game.board[capturedRow][capturedCol] {
+                let capturedColor = capturedPiece.color
+                game.board[capturedRow][capturedCol] = nil
+
+                var remainingPieces = 0
+                for r in 0..<8 {
+                    for c in 0..<8 {
+                        if let p = game.board[r][c], p.color == capturedColor {
+                            remainingPieces += 1
+                        }
+                    }
+                }
+
+                if remainingPieces == 0 {
+                    game.gameOver = true
+                    game.winner = capturedColor == .white ? .black : .white
+                }
+            }
         }
         
         movingPiece = (piece: piece, from: from, to: to)
@@ -81,6 +113,8 @@ struct CheckersBoardView: View {
                 gameRoom.sendBoardState(game.board)
             }
             
+            game.checkGameOver()
+            
             movingPiece = nil
             moveProgress = 0
             draggedPiece = nil
@@ -111,7 +145,7 @@ struct CheckersBoardView: View {
     }
     
     private func startTimer() {
-        if isFirstMove {
+        if isFirstMove || settings.timePerMove <= 0 {
             return
         }
         timer?.invalidate()
@@ -428,6 +462,10 @@ struct CheckersBoardView: View {
                 if !gameRoom.isHost {
                     game.currentPlayer = .black
                 }
+
+                if gameRoom.isHost {
+                    game.checkGameOver()
+                }
                 
                 setInitialTimerValues()
                 
@@ -447,6 +485,9 @@ struct CheckersBoardView: View {
                 var fromPosition: Position?
                 var toPosition: Position?
                 var movedPiece: Piece?
+
+                gameRoom.capturedWhitePieces = game.capturedWhitePieces
+                gameRoom.capturedBlackPieces = game.capturedBlackPieces
                 
                 for row in 0..<8 {
                     for col in 0..<8 {
@@ -493,6 +534,31 @@ struct CheckersBoardView: View {
                         }
                         opponentMove = nil
                         opponentMoveProgress = 0
+
+                        game.checkGameOver()
+
+                        var whitePieces = 0
+                        var blackPieces = 0
+                        
+                        for r in 0..<8 {
+                            for c in 0..<8 {
+                                if let p = game.board[r][c] {
+                                    if p.color == .white {
+                                        whitePieces += 1
+                                    } else {
+                                        blackPieces += 1
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if whitePieces == 0 {
+                            game.gameOver = true
+                            game.winner = .black
+                        } else if blackPieces == 0 {
+                            game.gameOver = true
+                            game.winner = .white
+                        }
                     }
                 }
             }
@@ -515,11 +581,15 @@ struct CheckersBoardView: View {
     }
     
     func endgameReason(winner: PieceColor) -> String {
-        if whiteTimeRemaining <= 0 {
-            return "White player ran out of time"
-        } else if blackTimeRemaining <= 0 {
-            return "Black player ran out of time"
-        } else if !game.hasAnyValidMoves(for: winner == .white ? .black : .white) {
+        if settings.timePerMove > 0 {
+            if whiteTimeRemaining <= 0 {
+                return "White player ran out of time"
+            } else if blackTimeRemaining <= 0 {
+                return "Black player ran out of time"
+            }
+        }
+
+        if !game.hasAnyValidMoves(for: winner == .white ? .black : .white) {
             return "\(winner == .white ? "Black" : "White") pieces are blocked"
         } else {
             return "\(winner == .white ? "Black" : "White") pieces are captured"

@@ -45,14 +45,6 @@ struct GameOverView: View {
                                     .fill(winner == .white ? Color.white.opacity(0.2) : Color.black.opacity(0.2))
                             )
                     }
-                    
-                    if !reason.isEmpty {
-                        Text(reason)
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(.white.opacity(0.8))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 20)
-                    }
                 }
                 
                 Button {

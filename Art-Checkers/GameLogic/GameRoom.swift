@@ -187,35 +187,44 @@ class GameRoom: NSObject, ObservableObject {
 
 extension GameRoom: MCSessionDelegate {
     func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
+        DispatchQueue.main.async {
             switch state {
             case .connected:
-                print("GameRoom: Успешное подключение к \(peerID.displayName)")
-                if !self.connectedPeers.contains(peerID) {
-                    self.connectedPeers.append(peerID)
-                }
-                if self.availablePeers.contains(peerID) {
-                    self.availablePeers.removeAll { $0 == peerID }
-                }
+                self.connectedPeers.append(peerID)
+                self.availablePeers.removeAll { $0 == peerID }
+                self.statusMessage = "Connected to \(peerID.displayName)"
+                print("GameRoom: Подключено к \(peerID.displayName)")
 
-                if self.isHost, let settings = self.currentSettings {
-                    self.sendGameSettings(settings)
+                if self.isHost {
+                    var pieces: [[Piece?]] = Array(repeating: Array(repeating: nil, count: 8), count: 8)
+                    for row in 0..<8 {
+                        for col in 0..<8 {
+                            let pieceState = self.boardState[row][col]
+                            if pieceState != "." {
+                                let color: PieceColor = pieceState.hasPrefix("W") ? .white : .black
+                                let isKing = pieceState.hasSuffix("K")
+                                let position = Position(row: row, col: col)
+                                var piece = Piece(color: color, type: isKing ? .king : .normal, position: position)
+                                piece.isKing = isKing
+                                pieces[row][col] = piece
+                            }
+                        }
+                    }
+                    self.sendBoardState(pieces)
                 }
                 
             case .connecting:
+                self.statusMessage = "Connecting to \(peerID.displayName)..."
                 print("GameRoom: Подключение к \(peerID.displayName)...")
                 
             case .notConnected:
-                print("GameRoom: Отключено от \(peerID.displayName)")
                 self.connectedPeers.removeAll { $0 == peerID }
-
-                if !self.isHost && !self.availablePeers.contains(peerID) {
-                    self.availablePeers.append(peerID)
-                }
+                self.statusMessage = "Disconnected from \(peerID.displayName)"
+                print("GameRoom: Отключено от \(peerID.displayName)")
+                
             @unknown default:
-                break
+                self.statusMessage = "Unknown state for \(peerID.displayName)"
+                print("GameRoom: Неизвестное состояние для \(peerID.displayName)")
             }
         }
     }
