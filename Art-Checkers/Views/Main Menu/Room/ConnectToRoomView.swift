@@ -12,6 +12,8 @@ struct ConnectToRoomView: View {
     @Environment(\.dismiss) var dismiss
     @Binding var showGame: Bool
     @State private var isSearching = false
+    @State private var isConnecting = false
+    @State private var connectingToPeer: String?
     
     var body: some View {
         VStack(spacing: 0) {
@@ -98,11 +100,18 @@ struct ConnectToRoomView: View {
             } else {
                 VStack(spacing: 16) {
                     Button {
+                        isConnecting = true
                         gameRoom.connectToRandomRoom()
                     } label: {
                         HStack {
-                            Image(systemName: "dice.fill")
-                                .font(.system(size: 18))
+                            if isConnecting && connectingToPeer == nil {
+                                ProgressView()
+                                    .tint(.white)
+                                    .padding(.trailing, 8)
+                            } else {
+                                Image(systemName: "dice.fill")
+                                    .font(.system(size: 18))
+                            }
                             Text("Connect to Random Room")
                                 .font(.system(size: 16, weight: .medium))
                         }
@@ -121,12 +130,15 @@ struct ConnectToRoomView: View {
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
+                    .disabled(isConnecting)
                     .padding(.top, 8)
                     
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(gameRoom.availablePeers, id: \.self) { peer in
-                                RoomCell(peer: peer.displayName) {
+                                RoomCell(peer: peer.displayName, isConnecting: isConnecting && connectingToPeer == peer.displayName) {
+                                    isConnecting = true
+                                    connectingToPeer = peer.displayName
                                     gameRoom.connectToPeer(peer)
                                 }
                             }
