@@ -256,10 +256,19 @@ struct CheckersBoardView: View {
                                         let isOpponentMoving = opponentMove?.from.row == row && opponentMove?.from.col == col
                                         
                                         if !isMoving && !isOpponentMoving {
+                                            let hasValidMoves = !game.getPossibleMoves(for: piece).isEmpty
+                                            let hasCaptureMoves = game.hasCaptureMovesForPiece(piece, from: Position(row: row, col: col))
+                                            let isCurrentPlayerPiece = piece.color == game.currentPlayer && 
+                                                                      ((gameRoom.isHost && piece.color == settings.playerColor) || 
+                                                                       (!gameRoom.isHost && piece.color == settings.playerColor))
+                                            
                                             PieceView(piece: piece, size: squareSize * 0.8)
                                                 .overlay(
                                                     isSelected ? Circle()
-                                                        .stroke(Color.green, lineWidth: 2)
+                                                        .stroke(
+                                                            hasCaptureMoves ? Color.green : (hasValidMoves ? Color.blue : Color.red),
+                                                            lineWidth: 2
+                                                        )
                                                         .frame(width: squareSize * 0.8, height: squareSize * 0.8) : nil
                                                 )
                                                 .position(
@@ -267,9 +276,7 @@ struct CheckersBoardView: View {
                                                     y: CGFloat(displayRow) * squareSize + squareSize / 2
                                                 )
                                                 .onTapGesture {
-                                                    if piece.color == game.currentPlayer && 
-                                                       ((gameRoom.isHost && piece.color == settings.playerColor) || 
-                                                        (!gameRoom.isHost && piece.color == settings.playerColor)) {
+                                                    if isCurrentPlayerPiece {
                                                         selectedPosition = Position(row: row, col: col)
                                                         draggedPiece = piece
                                                         dragOffset = .zero
