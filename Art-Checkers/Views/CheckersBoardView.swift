@@ -40,6 +40,11 @@ struct CheckersBoardView: View {
         moveProgress = 0
         game.board[from.row][from.col] = nil
         
+        game.currentPlayer = game.currentPlayer == .white ? .black : .white
+        if let gameRoom = game.gameRoom {
+            gameRoom.playerChanged(currentPlayer: game.currentPlayer == .white ? "White" : "Black")
+        }
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 moveProgress = 1
@@ -63,10 +68,8 @@ struct CheckersBoardView: View {
             
             if let gameRoom = game.gameRoom {
                 gameRoom.sendBoardState(game.board)
-                gameRoom.playerChanged(currentPlayer: game.currentPlayer == .white ? "White" : "Black")
             }
             
-            game.currentPlayer = game.currentPlayer == .white ? .black : .white
             movingPiece = nil
             moveProgress = 0
             draggedPiece = nil

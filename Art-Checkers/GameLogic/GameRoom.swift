@@ -9,8 +9,6 @@ import Foundation
 import MultipeerConnectivity
 
 class GameRoom: NSObject, ObservableObject {
-    @Published var counter1: Int = 0
-    @Published var counter2: Int = 0
     @Published var currentPlayer = "White"
     @Published var isHost: Bool = false
     @Published var connectedPeers: [MCPeerID] = []
@@ -157,18 +155,6 @@ class GameRoom: NSObject, ObservableObject {
             capturedBlack: capturedBlackPieces
         ))
         try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
-    }
-    
-    func incrementCounter1() {
-        counter1 += 1
-        print("GameRoom: Увеличен счетчик 1 до \(counter1)")
-        sendCounterUpdate()
-    }
-    
-    func incrementCounter2() {
-        counter2 += 1
-        print("GameRoom: Увеличен счетчик 2 до \(counter2)")
-        sendCounterUpdate()
     }
     
     func playerChanged(currentPlayer: String) {

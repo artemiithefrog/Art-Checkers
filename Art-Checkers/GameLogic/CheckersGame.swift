@@ -236,8 +236,6 @@ class CheckersGame: ObservableObject {
         board[to.row][to.col] = updatedPiece
         board[from.row][from.col] = nil
         
-        currentPlayer = currentPlayer == .white ? .black : .white
-        
         if let gameRoom = gameRoom {
             gameRoom.sendBoardState(board)
             gameRoom.playerChanged(currentPlayer: currentPlayer == .white ? "White" : "Black")
