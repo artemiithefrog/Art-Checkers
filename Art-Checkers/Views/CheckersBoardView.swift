@@ -237,7 +237,7 @@ struct CheckersBoardView: View {
                                 let displayRow = gameRoom.isHost ? target.row : 7 - target.row
                                 let displayCol = gameRoom.isHost ? target.col : 7 - target.col
                                 Rectangle()
-                                    .fill(Color.blue.opacity(0.3))
+                                    .fill(Color.green.opacity(0.3))
                                     .frame(width: squareSize, height: squareSize)
                                     .position(
                                         x: CGFloat(displayCol) * squareSize + squareSize / 2,
@@ -266,7 +266,7 @@ struct CheckersBoardView: View {
                                                 .overlay(
                                                     isSelected ? Circle()
                                                         .stroke(
-                                                            hasCaptureMoves ? Color.green : (hasValidMoves ? Color.blue : Color.red),
+                                                            hasCaptureMoves ? Color.green : (hasValidMoves ? Color.green : Color.red),
                                                             lineWidth: 2
                                                         )
                                                         .frame(width: squareSize * 0.8, height: squareSize * 0.8) : nil

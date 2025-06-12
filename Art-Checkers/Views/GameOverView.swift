@@ -36,18 +36,6 @@ struct GameOverView: View {
                             .background(Color.blue)
                             .cornerRadius(10)
                     }
-                    
-                    Button(action: {
-                        // TODO: Start new game
-                    }) {
-                        Text("New Game")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 30)
-                            .padding(.vertical, 15)
-                            .background(Color.green)
-                            .cornerRadius(10)
-                    }
                 }
             }
             .padding(40)
