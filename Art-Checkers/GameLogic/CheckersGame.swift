@@ -114,44 +114,40 @@ class CheckersGame: ObservableObject {
         
         if board[to.row][to.col] != nil { return false }
         
-        if let lastCapture = lastCapturePosition, lastCapture == from {
-            if piece.type == .king {
-                return isValidKingCapture(from: from, to: to)
+        if hasAnyCaptureMoves() {
+            if let lastCapture = lastCapturePosition, lastCapture == from {
+                if piece.type == .king {
+                    return isValidKingCapture(from: from, to: to)
+                }
+                if abs(rowDiff) != 2 { return false }
+                
+                let capturedRow = (from.row + to.row) / 2
+                let capturedCol = (from.col + to.col) / 2
+                
+                guard let capturedPiece = board[capturedRow][capturedCol] else { return false }
+                if capturedPiece.color == piece.color { return false }
+                return true
             }
-            if abs(rowDiff) != 2 { return false }
             
-            let capturedRow = (from.row + to.row) / 2
-            let capturedCol = (from.col + to.col) / 2
+            if abs(rowDiff) == 2 && abs(colDiff) == 2 {
+                let capturedRow = (from.row + to.row) / 2
+                let capturedCol = (from.col + to.col) / 2
+                
+                guard let capturedPiece = board[capturedRow][capturedCol] else { return false }
+                if capturedPiece.color == piece.color { return false }
+                return true
+            }
             
-            guard let capturedPiece = board[capturedRow][capturedCol] else { return false }
-            if capturedPiece.color == piece.color { return false }
-            return true
+            return false
         }
         
         if piece.type == .king {
-            if hasAnyCaptureMoves() {
-                return isValidKingCapture(from: from, to: to)
-            }
             return isValidKingMove(from: from, to: to)
         }
         
         if abs(rowDiff) == 1 && abs(colDiff) == 1 {
-            if hasAnyCaptureMoves() {
-                return false
-            }
-            
             if piece.color == .white && rowDiff >= 0 { return false }
             if piece.color == .black && rowDiff <= 0 { return false }
-            
-            return true
-        }
-        
-        if abs(rowDiff) == 2 && abs(colDiff) == 2 {
-            let capturedRow = (from.row + to.row) / 2
-            let capturedCol = (from.col + to.col) / 2
-            
-            guard let capturedPiece = board[capturedRow][capturedCol] else { return false }
-            if capturedPiece.color == piece.color { return false }
             return true
         }
         
@@ -296,18 +292,12 @@ class CheckersGame: ObservableObject {
     }
     
     func getPossibleMoves(for piece: Piece) -> Set<Position> {
-        if let lastCapture = lastCapturePosition, lastCapture == piece.position {
+        if hasAnyCaptureMoves() {
+            if let lastCapture = lastCapturePosition, lastCapture == piece.position {
+                return getCaptureMovesForPiece(piece, from: piece.position)
+            }
+            
             return getCaptureMovesForPiece(piece, from: piece.position)
-        }
-        
-        let backwardCaptureMoves = getBackwardCaptureMoves(for: piece)
-        if !backwardCaptureMoves.isEmpty {
-            return backwardCaptureMoves
-        }
-        
-        let forwardCaptureMoves = getCaptureMovesForPiece(piece, from: piece.position)
-        if !forwardCaptureMoves.isEmpty {
-            return forwardCaptureMoves
         }
         
         var moves: Set<Position> = []
