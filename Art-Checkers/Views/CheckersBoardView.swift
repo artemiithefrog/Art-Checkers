@@ -19,6 +19,8 @@ struct CheckersBoardView: View {
     @State private var moveProgress: CGFloat = 0
     @State private var opponentMove: (piece: Piece, from: Position, to: Position)?
     @State private var opponentMoveProgress: CGFloat = 0
+    @State private var capturedPiece: (piece: Piece, position: Position)?
+    @State private var capturedPieceOpacity: Double = 1.0
     
     init(game: CheckersGame, selectedPosition: Binding<Position?>, draggedPiece: Binding<Piece?>, dragOffset: Binding<CGSize>, settings: GameSettings, showGame: Binding<Bool>, gameRoom: GameRoom) {
         self.game = game
@@ -35,6 +37,22 @@ struct CheckersBoardView: View {
     
     private func movePiece(from: Position, to: Position) {
         guard let piece = game.board[from.row][from.col] else { return }
+        
+        let rowDiff = to.row - from.row
+        let colDiff = abs(to.col - from.col)
+        
+        if abs(rowDiff) == 2 && abs(colDiff) == 2 {
+            let capturedRow = (from.row + to.row) / 2
+            let capturedCol = (from.col + to.col) / 2
+            
+            if let capturedPiece = game.board[capturedRow][capturedCol] {
+                self.capturedPiece = (piece: capturedPiece, position: Position(row: capturedRow, col: capturedCol))
+                withAnimation(.easeOut(duration: 0.3)) {
+                    capturedPieceOpacity = 0
+                }
+            }
+            game.board[capturedRow][capturedCol] = nil
+        }
         
         movingPiece = (piece: piece, from: from, to: to)
         moveProgress = 0
@@ -77,6 +95,10 @@ struct CheckersBoardView: View {
             targetPosition = nil
             possibleMovesOpacity = 0
             dragOffset = .zero
+            
+            // Reset captured piece state
+            capturedPiece = nil
+            capturedPieceOpacity = 1.0
         }
     }
     
@@ -243,8 +265,9 @@ struct CheckersBoardView: View {
                                         
                                         let isMoving = movingPiece?.from.row == row && movingPiece?.from.col == col
                                         let isOpponentMoving = opponentMove?.from.row == row && opponentMove?.from.col == col
+                                        let isCaptured = capturedPiece?.position.row == row && capturedPiece?.position.col == col
                                         
-                                        if !isMoving && !isOpponentMoving {
+                                        if !isMoving && !isOpponentMoving && !isCaptured {
                                             PieceView(piece: piece, size: squareSize * 0.8)
                                                 .overlay(
                                                     isSelected ? Circle()
@@ -326,6 +349,18 @@ struct CheckersBoardView: View {
                                             }
                                         }
                                 }
+                            }
+                            
+                            if let captured = capturedPiece {
+                                let displayRow = gameRoom.isHost ? captured.position.row : 7 - captured.position.row
+                                let displayCol = gameRoom.isHost ? captured.position.col : 7 - captured.position.col
+                                
+                                PieceView(piece: captured.piece, size: squareSize * 0.8)
+                                    .opacity(capturedPieceOpacity)
+                                    .position(
+                                        x: CGFloat(displayCol) * squareSize + squareSize / 2,
+                                        y: CGFloat(displayRow) * squareSize + squareSize / 2
+                                    )
                             }
                         }
                     }
@@ -412,7 +447,6 @@ struct CheckersBoardView: View {
                 }
             }
             .onChange(of: gameRoom.boardState) { newBoardState in
-                // Find the moved piece by comparing old and new board states
                 var fromPosition: Position?
                 var toPosition: Position?
                 var movedPiece: Piece?
