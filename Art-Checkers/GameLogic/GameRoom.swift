@@ -59,14 +59,13 @@ class GameRoom: NSObject, ObservableObject {
     }
     
     private func setupInitialBoardState() {
-        // Заполняем начальное расположение шашек
         for row in 0..<8 {
             for col in 0..<8 {
-                if (row + col) % 2 == 1 { // Только на черных клетках
+                if (row + col) % 2 == 1 {
                     if row < 3 {
-                        boardState[row][col] = "B" // Черные шашки внизу
+                        boardState[row][col] = "B"
                     } else if row > 4 {
-                        boardState[row][col] = "W" // Белые шашки вверху
+                        boardState[row][col] = "W"
                     }
                 }
             }
@@ -75,25 +74,19 @@ class GameRoom: NSObject, ObservableObject {
     
     func cleanup() {
         print("GameRoom: Очистка состояния")
-        
-        // Сначала отключаем все пиры
+
         for peer in connectedPeers {
             session?.cancelConnectPeer(peer)
         }
-        
-        // Останавливаем рекламу и браузер
+
         advertiser?.stopAdvertisingPeer()
         browser?.stopBrowsingForPeers()
-        
-        // Очищаем списки
+
         connectedPeers.removeAll()
         availablePeers.removeAll()
-        
-        // Сбрасываем состояние
-        isHost = false
+                isHost = false
         currentSettings = nil
         
-        // Пересоздаем сессию
         setupSession()
     }
     
@@ -106,8 +99,7 @@ class GameRoom: NSObject, ObservableObject {
         advertiser?.startAdvertisingPeer()
         
         currentSettings = settings
-        
-        // Отправляем настройки при подключении
+
         if let peer = connectedPeers.first {
             sendGameSettings(settings)
         }
@@ -221,8 +213,7 @@ extension GameRoom: MCSessionDelegate {
                 if self.availablePeers.contains(peerID) {
                     self.availablePeers.removeAll { $0 == peerID }
                 }
-                
-                // Отправляем настройки при подключении
+
                 if self.isHost, let settings = self.currentSettings {
                     self.sendGameSettings(settings)
                 }
@@ -233,8 +224,7 @@ extension GameRoom: MCSessionDelegate {
             case .notConnected:
                 print("GameRoom: Отключено от \(peerID.displayName)")
                 self.connectedPeers.removeAll { $0 == peerID }
-                
-                // Если мы не хост и отключились, пробуем переподключиться
+
                 if !self.isHost && !self.availablePeers.contains(peerID) {
                     self.availablePeers.append(peerID)
                 }
@@ -281,8 +271,7 @@ extension GameRoom: MCSessionDelegate {
                     boardStyle: UserDefaultsManager.shared.getSelectedBoardStyle()
                 )
                 self.currentSettings = gameSettings
-                
-                // Создаем словарь с начальными значениями таймеров
+
                 let timerValues = [
                     "initialWhiteTime": settings.initialWhiteTime,
                     "initialBlackTime": settings.initialBlackTime
