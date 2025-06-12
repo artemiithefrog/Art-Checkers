@@ -17,6 +17,8 @@ struct CheckersBoardView: View {
     @ObservedObject var gameRoom: GameRoom
     @State private var movingPiece: (piece: Piece, from: Position, to: Position)?
     @State private var moveProgress: CGFloat = 0
+    @State private var opponentMove: (piece: Piece, from: Position, to: Position)?
+    @State private var opponentMoveProgress: CGFloat = 0
     
     init(game: CheckersGame, selectedPosition: Binding<Position?>, draggedPiece: Binding<Piece?>, dragOffset: Binding<CGSize>, settings: GameSettings, showGame: Binding<Bool>, gameRoom: GameRoom) {
         self.game = game
@@ -37,11 +39,13 @@ struct CheckersBoardView: View {
         movingPiece = (piece: piece, from: from, to: to)
         moveProgress = 0
         
-        withAnimation(.easeInOut(duration: 0.15)) {
-            moveProgress = 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                moveProgress = 1
+            }
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
             game.makeMove(from: from, to: to)
             if settings.timePerMove > 0 {
                 resetTimers()
@@ -266,6 +270,22 @@ struct CheckersBoardView: View {
                                     .zIndex(1)
                             }
                             
+                            if let opponentMove = opponentMove {
+                                let fromRow = gameRoom.isHost ? opponentMove.from.row : 7 - opponentMove.from.row
+                                let fromCol = gameRoom.isHost ? opponentMove.from.col : 7 - opponentMove.from.col
+                                let toRow = gameRoom.isHost ? opponentMove.to.row : 7 - opponentMove.to.row
+                                let toCol = gameRoom.isHost ? opponentMove.to.col : 7 - opponentMove.to.col
+                                
+                                PieceView(piece: opponentMove.piece, size: squareSize * 0.8)
+                                    .position(
+                                        x: CGFloat(fromCol) * squareSize + squareSize / 2 + 
+                                           (CGFloat(toCol - fromCol) * squareSize * opponentMoveProgress),
+                                        y: CGFloat(fromRow) * squareSize + squareSize / 2 + 
+                                           (CGFloat(toRow - fromRow) * squareSize * opponentMoveProgress)
+                                    )
+                                    .zIndex(1)
+                            }
+                            
                             if let selected = selectedPosition,
                                let piece = game.board[selected.row][selected.col] {
                                 ForEach(Array(game.getPossibleMoves(for: piece)), id: \.self) { position in
@@ -371,18 +391,70 @@ struct CheckersBoardView: View {
                 }
             }
             .onChange(of: gameRoom.boardState) { newBoardState in
+                // Find the moved piece by comparing old and new board states
+                var fromPosition: Position?
+                var toPosition: Position?
+                var movedPiece: Piece?
+                
                 for row in 0..<8 {
                     for col in 0..<8 {
-                        let pieceState = newBoardState[row][col]
-                        if pieceState != "." {
-                            let color: PieceColor = pieceState.hasPrefix("W") ? .white : .black
-                            let isKing = pieceState.hasSuffix("K")
-                            let position = Position(row: row, col: col)
-                            var piece = Piece(color: color, type: isKing ? .king : .normal, position: position)
-                            piece.isKing = isKing
-                            game.board[row][col] = piece
-                        } else {
-                            game.board[row][col] = nil
+                        let oldPiece = game.board[row][col]
+                        let newPieceState = newBoardState[row][col]
+                        
+                        if oldPiece != nil && newPieceState == "." {
+                            fromPosition = Position(row: row, col: col)
+                            movedPiece = oldPiece
+                        }
+                        
+                        if oldPiece == nil && newPieceState != "." {
+                            toPosition = Position(row: row, col: col)
+                        }
+                    }
+                }
+                
+                if let from = fromPosition, let to = toPosition, let piece = movedPiece {
+                    opponentMove = (piece: piece, from: from, to: to)
+                    opponentMoveProgress = 0
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            opponentMoveProgress = 1
+                        }
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        for row in 0..<8 {
+                            for col in 0..<8 {
+                                let pieceState = newBoardState[row][col]
+                                if pieceState != "." {
+                                    let color: PieceColor = pieceState.hasPrefix("W") ? .white : .black
+                                    let isKing = pieceState.hasSuffix("K")
+                                    let position = Position(row: row, col: col)
+                                    var piece = Piece(color: color, type: isKing ? .king : .normal, position: position)
+                                    piece.isKing = isKing
+                                    game.board[row][col] = piece
+                                } else {
+                                    game.board[row][col] = nil
+                                }
+                            }
+                        }
+                        opponentMove = nil
+                        opponentMoveProgress = 0
+                    }
+                } else {
+                    for row in 0..<8 {
+                        for col in 0..<8 {
+                            let pieceState = newBoardState[row][col]
+                            if pieceState != "." {
+                                let color: PieceColor = pieceState.hasPrefix("W") ? .white : .black
+                                let isKing = pieceState.hasSuffix("K")
+                                let position = Position(row: row, col: col)
+                                var piece = Piece(color: color, type: isKing ? .king : .normal, position: position)
+                                piece.isKing = isKing
+                                game.board[row][col] = piece
+                            } else {
+                                game.board[row][col] = nil
+                            }
                         }
                     }
                 }
