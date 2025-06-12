@@ -1,14 +1,16 @@
 import SwiftUI
 
 struct GameOverView: View {
-    let winner: PieceColor
+    let winner: PieceColor?
     @Binding var showGame: Bool
     let reason: String
+    let isDraw: Bool
     
-    init(winner: PieceColor, showGame: Binding<Bool>, reason: String = "") {
+    init(winner: PieceColor?, showGame: Binding<Bool>, reason: String = "", isDraw: Bool = false) {
         self.winner = winner
         self._showGame = showGame
         self.reason = reason
+        self.isDraw = isDraw
     }
     
     var body: some View {
@@ -22,15 +24,27 @@ struct GameOverView: View {
                     .foregroundColor(.white)
                 
                 VStack(spacing: 15) {
-                    Text("\(winner == .white ? "White" : "Black") wins!")
-                        .font(.system(size: 30, weight: .semibold))
-                        .foregroundColor(winner == .white ? .white : .black)
-                        .padding(.horizontal, 40)
-                        .padding(.vertical, 20)
-                        .background(
-                            RoundedRectangle(cornerRadius: 15)
-                                .fill(winner == .white ? Color.white.opacity(0.2) : Color.black.opacity(0.2))
-                        )
+                    if isDraw {
+                        Text("Draw!")
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 40)
+                            .padding(.vertical, 20)
+                            .background(
+                                RoundedRectangle(cornerRadius: 15)
+                                    .fill(Color.white.opacity(0.2))
+                            )
+                    } else if let winner = winner {
+                        Text("\(winner == .white ? "White" : "Black") wins!")
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundColor(winner == .white ? .white : .black)
+                            .padding(.horizontal, 40)
+                            .padding(.vertical, 20)
+                            .background(
+                                RoundedRectangle(cornerRadius: 15)
+                                    .fill(winner == .white ? Color.white.opacity(0.2) : Color.black.opacity(0.2))
+                            )
+                    }
                     
                     if !reason.isEmpty {
                         Text(reason)

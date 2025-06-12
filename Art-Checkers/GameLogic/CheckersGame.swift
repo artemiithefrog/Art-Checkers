@@ -9,6 +9,7 @@ class CheckersGame: ObservableObject {
     @Published var lastCapturePosition: Position?
     @Published var gameOver: Bool = false
     @Published var winner: PieceColor?
+    @Published var isDraw: Bool = false
     @Published var capturedWhitePieces: Int = 0
     @Published var capturedBlackPieces: Int = 0
     var gameRoom: GameRoom?
@@ -271,17 +272,25 @@ class CheckersGame: ObservableObject {
         var blackPieces = 0
         var whiteCanMove = false
         var blackCanMove = false
+        var whiteKings = 0
+        var blackKings = 0
         
         for row in 0..<8 {
             for col in 0..<8 {
                 if let piece = board[row][col] {
                     if piece.color == .white {
                         whitePieces += 1
+                        if piece.type == .king {
+                            whiteKings += 1
+                        }
                         if !whiteCanMove {
                             whiteCanMove = hasAnyValidMoves(for: .white)
                         }
                     } else {
                         blackPieces += 1
+                        if piece.type == .king {
+                            blackKings += 1
+                        }
                         if !blackCanMove {
                             blackCanMove = hasAnyValidMoves(for: .black)
                         }
@@ -290,12 +299,22 @@ class CheckersGame: ObservableObject {
             }
         }
         
+        // Check for draw condition (only kings left)
+        if whitePieces == whiteKings && blackPieces == blackKings && whiteKings == 1 && blackKings == 1 {
+            gameOver = true
+            isDraw = true
+            winner = nil
+            return
+        }
+        
         if whitePieces == 0 || !whiteCanMove {
             gameOver = true
             winner = .black
+            isDraw = false
         } else if blackPieces == 0 || !blackCanMove {
             gameOver = true
             winner = .white
+            isDraw = false
         }
     }
     

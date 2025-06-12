@@ -396,11 +396,25 @@ struct CheckersBoardView: View {
                     Spacer()
                 }
                 
-                if game.gameOver, let winner = game.winner {
-                    let reason = !game.hasAnyValidMoves(for: winner == .white ? .black : .white) 
-                        ? "\(winner == .white ? "Black" : "White") pieces are blocked" 
-                        : "\(winner == .white ? "Black" : "White") pieces are captured"
-                    GameOverView(winner: winner, showGame: $showGame, reason: reason)
+                if game.gameOver {
+                    if game.isDraw {
+                        GameOverView(
+                            winner: nil,
+                            showGame: $showGame,
+                            reason: "Both players have only kings left",
+                            isDraw: true
+                        )
+                    } else if let winner = game.winner {
+                        let reason = !game.hasAnyValidMoves(for: winner == .white ? .black : .white) 
+                            ? "\(winner == .white ? "Black" : "White") pieces are blocked" 
+                            : "\(winner == .white ? "Black" : "White") pieces are captured"
+                        GameOverView(
+                            winner: winner,
+                            showGame: $showGame,
+                            reason: reason,
+                            isDraw: false
+                        )
+                    }
                 }
             }
             .alert("Exit Game", isPresented: $showExitAlert) {
