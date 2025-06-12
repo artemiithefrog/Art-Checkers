@@ -15,8 +15,8 @@ struct CheckersBoardView: View {
     @State private var timer: Timer?
     @State private var isFirstMove = true
     @ObservedObject var gameRoom: GameRoom
-    @State private var animatingPiece: (piece: Piece, from: Position, to: Position, progress: CGFloat)?
-    @State private var isAnimating = false
+    @State private var movingPiece: (piece: Piece, from: Position, to: Position)?
+    @State private var moveProgress: CGFloat = 0
     
     init(game: CheckersGame, selectedPosition: Binding<Position?>, draggedPiece: Binding<Piece?>, dragOffset: Binding<CGSize>, settings: GameSettings, showGame: Binding<Bool>, gameRoom: GameRoom) {
         self.game = game
@@ -31,6 +31,31 @@ struct CheckersBoardView: View {
         self.gameRoom = gameRoom
     }
     
+    private func movePiece(from: Position, to: Position) {
+        guard let piece = game.board[from.row][from.col] else { return }
+        
+        movingPiece = (piece: piece, from: from, to: to)
+        moveProgress = 0
+        
+        withAnimation(.easeInOut(duration: 0.15)) {
+            moveProgress = 1
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            game.makeMove(from: from, to: to)
+            if settings.timePerMove > 0 {
+                resetTimers()
+            }
+            movingPiece = nil
+            moveProgress = 0
+            draggedPiece = nil
+            selectedPosition = nil
+            targetPosition = nil
+            possibleMovesOpacity = 0
+            dragOffset = .zero
+        }
+    }
+    
     private func setInitialTimerValues() {
         if settings.timePerMove > 0 {
             whiteTimeRemaining = Int(settings.timePerMove)
@@ -38,14 +63,56 @@ struct CheckersBoardView: View {
         }
     }
     
+    private func resetTimers() {
+        if settings.timePerMove > 0 {
+            if game.currentPlayer == .white {
+                blackTimeRemaining = Int(settings.timePerMove)
+            } else {
+                whiteTimeRemaining = Int(settings.timePerMove)
+            }
+            isFirstMove = false
+            startTimer()
+        }
+    }
+    
+    private func startTimer() {
+        if isFirstMove {
+            return
+        }
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            if game.currentPlayer == .white {
+                if whiteTimeRemaining > 0 {
+                    whiteTimeRemaining -= 1
+                } else {
+                    timer?.invalidate()
+                    game.gameOver = true
+                    game.winner = .black
+                }
+            } else {
+                if blackTimeRemaining > 0 {
+                    blackTimeRemaining -= 1
+                } else {
+                    timer?.invalidate()
+                    game.gameOver = true
+                    game.winner = .white
+                }
+            }
+        }
+    }
+    
+    private func formatTime(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let remainingSeconds = seconds % 60
+        return String(format: "%02d:%02d", minutes, remainingSeconds)
+    }
+    
     var body: some View {
         NavigationView {
             ZStack {
                 VStack {
                     HStack {
-                        Button(action: {
-                            showExitAlert = true
-                        }) {
+                        Button(action: { showExitAlert = true }) {
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 20, weight: .medium))
                                 .foregroundColor(.gray)
@@ -73,7 +140,7 @@ struct CheckersBoardView: View {
                     HStack(spacing: 20) {
                         if gameRoom.capturedWhitePieces > 0 {
                             HStack(spacing: -10) {
-                                ForEach(0..<min(gameRoom.capturedWhitePieces, 5), id: \.self) { index in
+                                ForEach(0..<min(gameRoom.capturedWhitePieces, 5), id: \.self) { _ in
                                     Circle()
                                         .fill(
                                             LinearGradient(
@@ -143,51 +210,6 @@ struct CheckersBoardView: View {
                                     )
                             }
                             
-                            if let selected = selectedPosition,
-                               let piece = game.board[selected.row][selected.col] {
-                                ForEach(Array(game.getPossibleMoves(for: piece)), id: \.self) { position in
-                                    let displayRow = gameRoom.isHost ? position.row : 7 - position.row
-                                    let displayCol = gameRoom.isHost ? position.col : 7 - position.col
-                                    Circle()
-                                        .fill(Color.green.opacity(0.3))
-                                        .frame(width: squareSize * 0.3, height: squareSize * 0.3)
-                                        .position(
-                                            x: CGFloat(displayCol) * squareSize + squareSize / 2,
-                                            y: CGFloat(displayRow) * squareSize + squareSize / 2
-                                        )
-                                        .opacity(possibleMovesOpacity)
-                                        .onTapGesture {
-                                            if game.isValidMove(from: selected, to: position) {
-                                                let rowDiff = position.row - selected.row
-                                                let colDiff = position.col - selected.col
-                                                
-                                                withAnimation(.easeInOut(duration: 0.3)) {
-                                                    isAnimating = true
-                                                    dragOffset = CGSize(
-                                                        width: CGFloat(colDiff) * squareSize,
-                                                        height: CGFloat(rowDiff) * squareSize
-                                                    )
-                                                }
-                                                
-                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                        game.makeMove(from: selected, to: position)
-                                                        if settings.timePerMove > 0 {
-                                                            resetTimers()
-                                                        }
-                                                    }
-                                                    self.draggedPiece = nil
-                                                    self.selectedPosition = nil
-                                                    self.targetPosition = nil
-                                                    self.possibleMovesOpacity = 0
-                                                    self.dragOffset = .zero
-                                                    self.isAnimating = false
-                                                }
-                                            }
-                                        }
-                                }
-                            }
-                            
                             ForEach(0..<8) { row in
                                 ForEach(0..<8) { col in
                                     if let piece = game.board[row][col] {
@@ -195,8 +217,15 @@ struct CheckersBoardView: View {
                                         let displayRow = gameRoom.isHost ? row : 7 - row
                                         let displayCol = gameRoom.isHost ? col : 7 - col
                                         
-                                        if !isSelected && !(animatingPiece?.from.row == row && animatingPiece?.from.col == col) {
+                                        let isMoving = movingPiece?.from.row == row && movingPiece?.from.col == col
+                                        
+                                        if !isMoving {
                                             PieceView(piece: piece, size: squareSize * 0.8)
+                                                .overlay(
+                                                    isSelected ? Circle()
+                                                        .stroke(Color.green, lineWidth: 2)
+                                                        .frame(width: squareSize * 0.8, height: squareSize * 0.8) : nil
+                                                )
                                                 .position(
                                                     x: CGFloat(displayCol) * squareSize + squareSize / 2,
                                                     y: CGFloat(displayRow) * squareSize + squareSize / 2
@@ -216,123 +245,46 @@ struct CheckersBoardView: View {
                                 }
                             }
                             
-                            if let draggedPiece = draggedPiece,
-                               let selectedPosition = selectedPosition {
-                                let displayRow = gameRoom.isHost ? selectedPosition.row : 7 - selectedPosition.row
-                                let displayCol = gameRoom.isHost ? selectedPosition.col : 7 - selectedPosition.col
+                            if let moving = movingPiece {
+                                let fromRow = gameRoom.isHost ? moving.from.row : 7 - moving.from.row
+                                let fromCol = gameRoom.isHost ? moving.from.col : 7 - moving.from.col
+                                let toRow = gameRoom.isHost ? moving.to.row : 7 - moving.to.row
+                                let toCol = gameRoom.isHost ? moving.to.col : 7 - moving.to.col
                                 
-                                let animating = animatingPiece?.from.row == selectedPosition.row && 
-                                              animatingPiece?.from.col == selectedPosition.col
-                                
-                                let targetRow = animating ? (gameRoom.isHost ? animatingPiece!.to.row : 7 - animatingPiece!.to.row) : displayRow
-                                let targetCol = animating ? (gameRoom.isHost ? animatingPiece!.to.col : 7 - animatingPiece!.to.col) : displayCol
-                                
-                                let progress = animating ? animatingPiece!.progress : 0
-                                
-                                PieceView(piece: draggedPiece, size: squareSize * 0.8)
+                                PieceView(piece: moving.piece, size: squareSize * 0.8)
                                     .overlay(
                                         Circle()
                                             .stroke(Color.green, lineWidth: 2)
                                             .frame(width: squareSize * 0.8, height: squareSize * 0.8)
                                     )
                                     .position(
-                                        x: CGFloat(displayCol) * squareSize + squareSize / 2 + 
-                                           (CGFloat(targetCol - displayCol) * squareSize * progress),
-                                        y: CGFloat(displayRow) * squareSize + squareSize / 2 + 
-                                           (CGFloat(targetRow - displayRow) * squareSize * progress)
+                                        x: CGFloat(fromCol) * squareSize + squareSize / 2 + 
+                                           (CGFloat(toCol - fromCol) * squareSize * moveProgress),
+                                        y: CGFloat(fromRow) * squareSize + squareSize / 2 + 
+                                           (CGFloat(toRow - fromRow) * squareSize * moveProgress)
                                     )
-                                    .offset(animating ? .zero : dragOffset)
                                     .zIndex(1)
-                                    .gesture(
-                                        DragGesture()
-                                            .onChanged { value in
-                                                if !animating {
-                                                    dragOffset = value.translation
-                                                    
-                                                    let pieceCenter = CGPoint(
-                                                        x: CGFloat(displayCol) * squareSize + squareSize / 2 + value.translation.width,
-                                                        y: CGFloat(displayRow) * squareSize + squareSize / 2 + value.translation.height
-                                                    )
-                                                    
-                                                    let targetCol = Int(round((pieceCenter.x - squareSize / 2) / squareSize))
-                                                    let targetRow = Int(round((pieceCenter.y - squareSize / 2) / squareSize))
-                                                    
-                                                    let actualTargetCol = gameRoom.isHost ? targetCol : 7 - targetCol
-                                                    let actualTargetRow = gameRoom.isHost ? targetRow : 7 - targetRow
-                                                    
-                                                    if actualTargetRow >= 0 && actualTargetRow < 8 && actualTargetCol >= 0 && actualTargetCol < 8 {
-                                                        targetPosition = Position(row: actualTargetRow, col: actualTargetCol)
-                                                    } else {
-                                                        targetPosition = nil
-                                                    }
-                                                }
+                            }
+                            
+                            if let selected = selectedPosition,
+                               let piece = game.board[selected.row][selected.col] {
+                                ForEach(Array(game.getPossibleMoves(for: piece)), id: \.self) { position in
+                                    let displayRow = gameRoom.isHost ? position.row : 7 - position.row
+                                    let displayCol = gameRoom.isHost ? position.col : 7 - position.col
+                                    Circle()
+                                        .fill(Color.green.opacity(0.3))
+                                        .frame(width: squareSize * 0.3, height: squareSize * 0.3)
+                                        .position(
+                                            x: CGFloat(displayCol) * squareSize + squareSize / 2,
+                                            y: CGFloat(displayRow) * squareSize + squareSize / 2
+                                        )
+                                        .opacity(possibleMovesOpacity)
+                                        .onTapGesture {
+                                            if game.isValidMove(from: selected, to: position) {
+                                                movePiece(from: selected, to: position)
                                             }
-                                            .onEnded { value in
-                                                if animating { return }
-                                                
-                                                let pieceCenter = CGPoint(
-                                                    x: CGFloat(displayCol) * squareSize + squareSize / 2 + value.translation.width,
-                                                    y: CGFloat(displayRow) * squareSize + squareSize / 2 + value.translation.height
-                                                )
-                                                
-                                                let targetCol = Int(round((pieceCenter.x - squareSize / 2) / squareSize))
-                                                let targetRow = Int(round((pieceCenter.y - squareSize / 2) / squareSize))
-                                                
-                                                let actualTargetCol = gameRoom.isHost ? targetCol : 7 - targetCol
-                                                let actualTargetRow = gameRoom.isHost ? targetRow : 7 - targetRow
-                                                
-                                                if actualTargetRow >= 0 && actualTargetRow < 8 && actualTargetCol >= 0 && actualTargetCol < 8 {
-                                                    let targetPosition = Position(row: actualTargetRow, col: actualTargetCol)
-                                                    
-                                                    let pieceOverlap = calculatePieceOverlap(
-                                                        pieceCenter: pieceCenter,
-                                                        targetSquare: CGPoint(
-                                                            x: CGFloat(targetCol) * squareSize + squareSize / 2,
-                                                            y: CGFloat(targetRow) * squareSize + squareSize / 2
-                                                        ),
-                                                        pieceSize: squareSize * 0.8,
-                                                        squareSize: squareSize
-                                                    )
-                                                    
-                                                    if pieceOverlap >= 0.4 && game.isValidMove(from: selectedPosition, to: targetPosition) {
-                                                        animatingPiece = (piece: draggedPiece, from: selectedPosition, to: targetPosition, progress: 0)
-                                                        
-                                                        withAnimation(.easeInOut(duration: 0.4)) {
-                                                            animatingPiece?.progress = 1
-                                                        }
-                                                        
-                                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                                            game.makeMove(from: selectedPosition, to: targetPosition)
-                                                            if settings.timePerMove > 0 {
-                                                                resetTimers()
-                                                            }
-                                                            self.draggedPiece = nil
-                                                            self.selectedPosition = nil
-                                                            self.targetPosition = nil
-                                                            self.possibleMovesOpacity = 0
-                                                            self.dragOffset = .zero
-                                                            self.animatingPiece = nil
-                                                        }
-                                                    } else {
-                                                        withAnimation(.easeInOut(duration: 0.2)) {
-                                                            dragOffset = .zero
-                                                        }
-                                                        self.draggedPiece = nil
-                                                        self.selectedPosition = nil
-                                                        self.targetPosition = nil
-                                                        self.possibleMovesOpacity = 0
-                                                    }
-                                                } else {
-                                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                                        dragOffset = .zero
-                                                    }
-                                                    self.draggedPiece = nil
-                                                    self.selectedPosition = nil
-                                                    self.targetPosition = nil
-                                                    self.possibleMovesOpacity = 0
-                                                }
-                                            }
-                                    )
+                                        }
+                                }
                             }
                         }
                     }
@@ -359,7 +311,7 @@ struct CheckersBoardView: View {
                     HStack(spacing: 20) {
                         if gameRoom.capturedBlackPieces > 0 {
                             HStack(spacing: -10) {
-                                ForEach(0..<min(gameRoom.capturedBlackPieces, 5), id: \.self) { index in
+                                ForEach(0..<min(gameRoom.capturedBlackPieces, 5), id: \.self) { _ in
                                     Circle()
                                         .fill(
                                             LinearGradient(
@@ -450,74 +402,6 @@ struct CheckersBoardView: View {
                 timer = nil
                 NotificationCenter.default.removeObserver(self)
             }
-        }
-    }
-    
-    private func calculatePieceOverlap(pieceCenter: CGPoint, targetSquare: CGPoint, pieceSize: CGFloat, squareSize: CGFloat) -> CGFloat {
-        let pieceRect = CGRect(
-            x: pieceCenter.x - pieceSize / 2,
-            y: pieceCenter.y - pieceSize / 2,
-            width: pieceSize,
-            height: pieceSize
-        )
-        
-        let squareRect = CGRect(
-            x: targetSquare.x - squareSize / 2,
-            y: targetSquare.y - squareSize / 2,
-            width: squareSize,
-            height: squareSize
-        )
-        
-        let intersection = pieceRect.intersection(squareRect)
-        let intersectionArea = intersection.width * intersection.height
-        let pieceArea = pieceSize * pieceSize
-        
-        return intersectionArea / pieceArea
-    }
-    
-    private func formatTime(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        let remainingSeconds = seconds % 60
-        return String(format: "%02d:%02d", minutes, remainingSeconds)
-    }
-    
-    private func startTimer() {
-        if isFirstMove {
-            return
-        }
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            if game.currentPlayer == .white {
-                if whiteTimeRemaining > 0 {
-                    whiteTimeRemaining -= 1
-                    blackTimeRemaining = Int(settings.timePerMove)
-                } else {
-                    timer?.invalidate()
-                    game.gameOver = true
-                    game.winner = .black
-                }
-            } else {
-                if blackTimeRemaining > 0 {
-                    blackTimeRemaining -= 1
-                    whiteTimeRemaining = Int(settings.timePerMove)
-                } else {
-                    timer?.invalidate()
-                    game.gameOver = true
-                    game.winner = .white
-                }
-            }
-        }
-    }
-    
-    private func resetTimers() {
-        if settings.timePerMove > 0 {
-            if game.currentPlayer == .white {
-                blackTimeRemaining = Int(settings.timePerMove)
-            } else {
-                whiteTimeRemaining = Int(settings.timePerMove)
-            }
-            isFirstMove = false
-            startTimer()
         }
     }
 }
