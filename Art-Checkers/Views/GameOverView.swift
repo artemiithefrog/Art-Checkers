@@ -3,6 +3,13 @@ import SwiftUI
 struct GameOverView: View {
     let winner: PieceColor
     @Binding var showGame: Bool
+    let reason: String
+    
+    init(winner: PieceColor, showGame: Binding<Bool>, reason: String = "") {
+        self.winner = winner
+        self._showGame = showGame
+        self.reason = reason
+    }
     
     var body: some View {
         ZStack {
@@ -14,15 +21,25 @@ struct GameOverView: View {
                     .font(.system(size: 40, weight: .bold))
                     .foregroundColor(.white)
                 
-                Text("\(winner == .white ? "White" : "Black") wins!")
-                    .font(.system(size: 30, weight: .semibold))
-                    .foregroundColor(winner == .white ? .white : .black)
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 20)
-                    .background(
-                        RoundedRectangle(cornerRadius: 15)
-                            .fill(winner == .white ? Color.white.opacity(0.2) : Color.black.opacity(0.2))
-                    )
+                VStack(spacing: 15) {
+                    Text("\(winner == .white ? "White" : "Black") wins!")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundColor(winner == .white ? .white : .black)
+                        .padding(.horizontal, 40)
+                        .padding(.vertical, 20)
+                        .background(
+                            RoundedRectangle(cornerRadius: 15)
+                                .fill(winner == .white ? Color.white.opacity(0.2) : Color.black.opacity(0.2))
+                        )
+                    
+                    if !reason.isEmpty {
+                        Text(reason)
+                            .font(.system(size: 18))
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                }
                 
                 HStack(spacing: 20) {
                     Button(action: {

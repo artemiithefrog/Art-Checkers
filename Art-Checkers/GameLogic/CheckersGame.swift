@@ -269,26 +269,48 @@ class CheckersGame: ObservableObject {
     private func checkGameOver() {
         var whitePieces = 0
         var blackPieces = 0
+        var whiteCanMove = false
+        var blackCanMove = false
         
         for row in 0..<8 {
             for col in 0..<8 {
                 if let piece = board[row][col] {
                     if piece.color == .white {
                         whitePieces += 1
+                        if !whiteCanMove {
+                            whiteCanMove = hasAnyValidMoves(for: .white)
+                        }
                     } else {
                         blackPieces += 1
+                        if !blackCanMove {
+                            blackCanMove = hasAnyValidMoves(for: .black)
+                        }
                     }
                 }
             }
         }
         
-        if whitePieces == 0 {
+        if whitePieces == 0 || !whiteCanMove {
             gameOver = true
             winner = .black
-        } else if blackPieces == 0 {
+        } else if blackPieces == 0 || !blackCanMove {
             gameOver = true
             winner = .white
         }
+    }
+    
+    func hasAnyValidMoves(for color: PieceColor) -> Bool {
+        for row in 0..<8 {
+            for col in 0..<8 {
+                if let piece = board[row][col], piece.color == color {
+                    let position = Position(row: row, col: col)
+                    if !getPossibleMoves(for: piece).isEmpty {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
     }
     
     func getPossibleMoves(for piece: Piece) -> Set<Position> {

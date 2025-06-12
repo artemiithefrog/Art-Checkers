@@ -397,7 +397,10 @@ struct CheckersBoardView: View {
                 }
                 
                 if game.gameOver, let winner = game.winner {
-                    GameOverView(winner: winner, showGame: $showGame)
+                    let reason = !game.hasAnyValidMoves(for: winner == .white ? .black : .white) 
+                        ? "\(winner == .white ? "Black" : "White") pieces are blocked" 
+                        : "\(winner == .white ? "Black" : "White") pieces are captured"
+                    GameOverView(winner: winner, showGame: $showGame, reason: reason)
                 }
             }
             .alert("Exit Game", isPresented: $showExitAlert) {
