@@ -8,7 +8,7 @@
 import Foundation
 import MultipeerConnectivity
 
-class GameRoom: NSObject, ObservableObject {
+class GameRoom: NSObject, ObservableObject, GameSessionManagerDelegate {
     @Published var currentPlayer = "White"
     @Published var isHost: Bool = false
     @Published var connectedPeers: [MCPeerID] = []
@@ -20,38 +20,13 @@ class GameRoom: NSObject, ObservableObject {
     @Published var capturedBlackPieces: Int = 0
     @Published var currentSettings: GameSettings?
     
-    private struct BoardStateData: Codable {
-        let boardState: [[String]]
-        let capturedWhite: Int
-        let capturedBlack: Int
-    }
-    
-    private struct GameSettingsData: Codable {
-        let playerColor: String
-        let timerMode: String
-        let timePerMove: Int
-        let initialWhiteTime: Int
-        let initialBlackTime: Int
-    }
-    
-    private var session: MCSession?
-    private var advertiser: MCNearbyServiceAdvertiser?
-    private var browser: MCNearbyServiceBrowser?
-    
-    private let serviceType = "checkers-game"
-    private let peerID: MCPeerID
+    private let sessionManager: GameSessionManager
     
     override init() {
-        peerID = MCPeerID(displayName: UIDevice.current.name)
+        sessionManager = GameSessionManager()
         super.init()
-        setupSession()
+        sessionManager.delegate = self
         setupInitialBoardState()
-    }
-    
-    private func setupSession() {
-        session = MCSession(peer: peerID, securityIdentity: nil, encryptionPreference: .required)
-        session?.delegate = self
-        statusMessage = "Сессия создана"
     }
     
     private func setupInitialBoardState() {
@@ -69,218 +44,81 @@ class GameRoom: NSObject, ObservableObject {
     }
     
     func cleanup() {
-
-        for peer in connectedPeers {
-            session?.cancelConnectPeer(peer)
-        }
-
-        advertiser?.stopAdvertisingPeer()
-        browser?.stopBrowsingForPeers()
-
-        connectedPeers.removeAll()
-        availablePeers.removeAll()
-                isHost = false
+        sessionManager.cleanup()
+        isHost = false
         currentSettings = nil
-        
-        setupSession()
     }
     
     func startHosting(settings: GameSettings) {
         cleanup()
-        
         isHost = true
-        advertiser = MCNearbyServiceAdvertiser(peer: peerID, discoveryInfo: nil, serviceType: serviceType)
-        advertiser?.delegate = self
-        advertiser?.startAdvertisingPeer()
-        
+        sessionManager.startHosting()
         currentSettings = settings
-
+        
         if let peer = connectedPeers.first {
-            sendGameSettings(settings)
+            sessionManager.sendGameSettings(settings)
         }
     }
     
     func startBrowsing() {
         cleanup()
-        
-        browser = MCNearbyServiceBrowser(peer: peerID, serviceType: serviceType)
-        browser?.delegate = self
-        browser?.startBrowsingForPeers()
-        statusMessage = "Поиск комнат..."
+        sessionManager.startBrowsing()
     }
     
     func sendInitialBoard(_ board: [[Piece?]]) {
-        guard let session = session else { return }
-        let boardData = try? JSONEncoder().encode(["initialBoard": board])
-        try? session.send(boardData ?? Data(), toPeers: session.connectedPeers, with: .reliable)
+        sessionManager.sendInitialBoard(board)
     }
     
     func sendGameSettings(_ settings: GameSettings) {
-        guard let session = session else { return }
-        let settingsData = GameSettingsData(
-            playerColor: settings.playerColor == .white ? "White" : "Black",
-            timerMode: settings.timerMode.rawValue,
-            timePerMove: Int(settings.timePerMove),
-            initialWhiteTime: Int(settings.timePerMove),
-            initialBlackTime: Int(settings.timePerMove)
-        )
-        let data = try? JSONEncoder().encode(["gameSettings": settingsData])
-        try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
+        sessionManager.sendGameSettings(settings)
     }
     
     func sendBoardState(_ board: [[Piece?]]) {
-        guard let session = session else { return }
-        var boardState: [[String]] = Array(repeating: Array(repeating: ".", count: 8), count: 8)
-        
-        for row in 0..<8 {
-            for col in 0..<8 {
-                if let piece = board[row][col] {
-                    let isKing = piece.isKing || piece.type == .king
-                    boardState[row][col] = piece.color == .white ? (isKing ? "WK" : "W") : (isKing ? "BK" : "B")
-                }
-            }
-        }
-        
-        let data = try? JSONEncoder().encode(BoardStateData(
-            boardState: boardState,
-            capturedWhite: capturedWhitePieces,
-            capturedBlack: capturedBlackPieces
-        ))
-        try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
+        sessionManager.sendBoardState(board, capturedWhite: capturedWhitePieces, capturedBlack: capturedBlackPieces)
     }
     
     func playerChanged(currentPlayer: String) {
         self.currentPlayer = currentPlayer
-        sendCounterUpdate()
-    }
-    
-    private func sendCounterUpdate() {
-        guard let session = session else { return }
-        let data = try? JSONEncoder().encode(["currentPlayer": currentPlayer])
-        try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
+        sessionManager.sendCurrentPlayer(currentPlayer)
     }
     
     func connectToPeer(_ peer: MCPeerID) {
-        browser?.invitePeer(peer, to: session!, withContext: nil, timeout: 30)
+        sessionManager.connectToPeer(peer)
     }
     
     func connectToRandomRoom() {
-        guard let randomPeer = availablePeers.randomElement() else {
-            return
-        }
-        
-        browser?.invitePeer(randomPeer, to: session!, withContext: nil, timeout: 30)
-    }
-}
-
-extension GameRoom: MCSessionDelegate {
-    func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
-        DispatchQueue.main.async {
-            switch state {
-            case .connected:
-                self.connectedPeers.append(peerID)
-                self.availablePeers.removeAll { $0 == peerID }
-                self.statusMessage = "Connected to \(peerID.displayName)"
-
-                if self.isHost {
-                    var pieces: [[Piece?]] = Array(repeating: Array(repeating: nil, count: 8), count: 8)
-                    for row in 0..<8 {
-                        for col in 0..<8 {
-                            let pieceState = self.boardState[row][col]
-                            if pieceState != "." {
-                                let color: PieceColor = pieceState.hasPrefix("W") ? .white : .black
-                                let isKing = pieceState.hasSuffix("K")
-                                let position = Position(row: row, col: col)
-                                var piece = Piece(color: color, type: isKing ? .king : .normal, position: position)
-                                piece.isKing = isKing
-                                pieces[row][col] = piece
-                            }
-                        }
-                    }
-                    self.sendBoardState(pieces)
-                }
-                
-            case .connecting:
-                self.statusMessage = "Connecting to \(peerID.displayName)..."
-                
-            case .notConnected:
-                self.connectedPeers.removeAll { $0 == peerID }
-                self.statusMessage = "Disconnected from \(peerID.displayName)"
-                
-            @unknown default:
-                self.statusMessage = "Unknown state for \(peerID.displayName)"
-            }
-        }
+        sessionManager.connectToRandomRoom()
     }
     
-    func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
-        if let playerData = try? JSONDecoder().decode([String: String].self, from: data),
-           let player = playerData["currentPlayer"] {
-            DispatchQueue.main.async {
-                self.currentPlayer = player
-            }
-        } else if let boardData = try? JSONDecoder().decode(BoardStateData.self, from: data) {
-            DispatchQueue.main.async {
-                self.boardState = boardData.boardState
-                self.capturedWhitePieces = boardData.capturedWhite
-                self.capturedBlackPieces = boardData.capturedBlack
-                for row in boardData.boardState {
-                    print(row.joined(separator: " "))
-                }
-                print("")
-            }
-        } else if let boardData = try? JSONDecoder().decode([String: [[Piece?]]].self, from: data),
-                  let board = boardData["initialBoard"] {
-            DispatchQueue.main.async {
-                self.initialBoard = board
-            }
-        } else if let settingsData = try? JSONDecoder().decode([String: GameSettingsData].self, from: data),
-                  let settings = settingsData["gameSettings"] {
-            DispatchQueue.main.async {
-                let gameSettings = GameSettings(
-                    playerColor: settings.playerColor == "White" ? .white : .black,
-                    timerMode: TimerMode(rawValue: settings.timerMode) ?? .noLimit,
-                    timePerMove: Double(settings.timePerMove),
-                    boardStyle: UserDefaultsManager.shared.getSelectedBoardStyle()
-                )
-                self.currentSettings = gameSettings
-
-                let timerValues = [
-                    "initialWhiteTime": settings.initialWhiteTime,
-                    "initialBlackTime": settings.initialBlackTime
-                ]
-                
-                NotificationCenter.default.post(name: NSNotification.Name("GameSettingsReceived"), object: gameSettings)
-                NotificationCenter.default.post(name: NSNotification.Name("TimerValuesReceived"), object: timerValues)
-            }
-        }
+    // MARK: - GameSessionManagerDelegate
+    
+    func didReceiveBoardState(_ boardState: [[String]], capturedWhite: Int, capturedBlack: Int) {
+        self.boardState = boardState
+        self.capturedWhitePieces = capturedWhite
+        self.capturedBlackPieces = capturedBlack
     }
     
-    func session(_ session: MCSession, didReceive stream: InputStream, withName streamName: String, fromPeer peerID: MCPeerID) {}
-    func session(_ session: MCSession, didStartReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, with progress: Progress) {}
-    func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: Error?) {}
-}
-
-extension GameRoom: MCNearbyServiceAdvertiserDelegate {
-    func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
-        invitationHandler(true, session)
+    func didReceiveInitialBoard(_ board: [[Piece?]]) {
+        self.initialBoard = board
     }
     
-    func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
-    }
-}
-
-extension GameRoom: MCNearbyServiceBrowserDelegate {
-    func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
-        if !availablePeers.contains(peerID) {
-            availablePeers.append(peerID)
-        }
+    func didReceiveGameSettings(_ settings: GameSettings) {
+        self.currentSettings = settings
     }
     
-    func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
-        availablePeers.removeAll { $0 == peerID }
+    func didReceiveCurrentPlayer(_ player: String) {
+        self.currentPlayer = player
     }
     
-    func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
+    func didUpdateConnectionStatus(_ status: String) {
+        self.statusMessage = status
+    }
+    
+    func didUpdateConnectedPeers(_ peers: [MCPeerID]) {
+        self.connectedPeers = peers
+    }
+    
+    func didUpdateAvailablePeers(_ peers: [MCPeerID]) {
+        self.availablePeers = peers
     }
 }
