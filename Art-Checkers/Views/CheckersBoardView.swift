@@ -34,148 +34,7 @@ struct CheckersBoardView: View {
         self._isFirstMove = State(initialValue: true)
         self.gameRoom = gameRoom
     }
-    
-    private func movePiece(from: Position, to: Position) {
-        guard let piece = game.board[from.row][from.col] else { return }
-        
-        let rowDiff = to.row - from.row
-        let colDiff = abs(to.col - from.col)
-        
-        if abs(rowDiff) == 2 && abs(colDiff) == 2 {
-            let capturedRow = (from.row + to.row) / 2
-            let capturedCol = (from.col + to.col) / 2
-            
-            if let capturedPiece = game.board[capturedRow][capturedCol] {
-                if capturedPiece.color == .white {
-                    game.capturedWhitePieces += 1
-                    if let gameRoom = game.gameRoom {
-                        gameRoom.capturedWhitePieces = game.capturedWhitePieces
-                    }
-                } else {
-                    game.capturedBlackPieces += 1
-                    if let gameRoom = game.gameRoom {
-                        gameRoom.capturedBlackPieces = game.capturedBlackPieces
-                    }
-                }
-            }
-            
-                if let capturedPiece = game.board[capturedRow][capturedCol] {
-                let capturedColor = capturedPiece.color
-                game.board[capturedRow][capturedCol] = nil
 
-                var remainingPieces = 0
-                for r in 0..<8 {
-                    for c in 0..<8 {
-                        if let p = game.board[r][c], p.color == capturedColor {
-                            remainingPieces += 1
-                        }
-                    }
-                }
-
-                if remainingPieces == 0 {
-                    game.gameOver = true
-                    game.winner = capturedColor == .white ? .black : .white
-                }
-            }
-        }
-        
-        movingPiece = (piece: piece, from: from, to: to)
-        moveProgress = 0
-        game.board[from.row][from.col] = nil
-        
-        game.currentPlayer = game.currentPlayer == .white ? .black : .white
-        if let gameRoom = game.gameRoom {
-            gameRoom.playerChanged(currentPlayer: game.currentPlayer == .white ? "White" : "Black")
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                moveProgress = 1
-            }
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            var updatedPiece = piece
-            updatedPiece.position = to
-            
-            if (piece.color == .white && to.row == 0) || (piece.color == .black && to.row == 7) {
-                updatedPiece.type = .king
-                updatedPiece.isKing = true
-            }
-            
-            game.board[to.row][to.col] = updatedPiece
-            
-            if settings.timePerMove > 0 {
-                resetTimers()
-            }
-            
-            if let gameRoom = game.gameRoom {
-                gameRoom.sendBoardState(game.board)
-            }
-            
-            game.checkGameOver()
-            
-            movingPiece = nil
-            moveProgress = 0
-            draggedPiece = nil
-            selectedPosition = nil
-            targetPosition = nil
-            possibleMovesOpacity = 0
-            dragOffset = .zero
-        }
-    }
-    
-    private func setInitialTimerValues() {
-        if settings.timePerMove > 0 {
-            whiteTimeRemaining = Int(settings.timePerMove)
-            blackTimeRemaining = Int(settings.timePerMove)
-        }
-    }
-    
-    private func resetTimers() {
-        if settings.timePerMove > 0 {
-            if game.currentPlayer == .white {
-                blackTimeRemaining = Int(settings.timePerMove)
-            } else {
-                whiteTimeRemaining = Int(settings.timePerMove)
-            }
-            isFirstMove = false
-            startTimer()
-        }
-    }
-    
-    private func startTimer() {
-        if isFirstMove || settings.timePerMove <= 0 {
-            return
-        }
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            if game.currentPlayer == .white {
-                if whiteTimeRemaining > 0 {
-                    whiteTimeRemaining -= 1
-                } else {
-                    timer?.invalidate()
-                    game.gameOver = true
-                    game.winner = .black
-                }
-            } else {
-                if blackTimeRemaining > 0 {
-                    blackTimeRemaining -= 1
-                } else {
-                    timer?.invalidate()
-                    game.gameOver = true
-                    game.winner = .white
-                }
-            }
-        }
-    }
-    
-    private func formatTime(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        let remainingSeconds = seconds % 60
-        return String(format: "%02d:%02d", minutes, remainingSeconds)
-    }
-    
     var body: some View {
         NavigationView {
             ZStack {
@@ -578,6 +437,147 @@ struct CheckersBoardView: View {
                 NotificationCenter.default.removeObserver(self)
             }
         }
+    }
+    
+    private func movePiece(from: Position, to: Position) {
+        guard let piece = game.board[from.row][from.col] else { return }
+        
+        let rowDiff = to.row - from.row
+        let colDiff = abs(to.col - from.col)
+        
+        if abs(rowDiff) == 2 && abs(colDiff) == 2 {
+            let capturedRow = (from.row + to.row) / 2
+            let capturedCol = (from.col + to.col) / 2
+            
+            if let capturedPiece = game.board[capturedRow][capturedCol] {
+                if capturedPiece.color == .white {
+                    game.capturedWhitePieces += 1
+                    if let gameRoom = game.gameRoom {
+                        gameRoom.capturedWhitePieces = game.capturedWhitePieces
+                    }
+                } else {
+                    game.capturedBlackPieces += 1
+                    if let gameRoom = game.gameRoom {
+                        gameRoom.capturedBlackPieces = game.capturedBlackPieces
+                    }
+                }
+            }
+            
+                if let capturedPiece = game.board[capturedRow][capturedCol] {
+                let capturedColor = capturedPiece.color
+                game.board[capturedRow][capturedCol] = nil
+
+                var remainingPieces = 0
+                for r in 0..<8 {
+                    for c in 0..<8 {
+                        if let p = game.board[r][c], p.color == capturedColor {
+                            remainingPieces += 1
+                        }
+                    }
+                }
+
+                if remainingPieces == 0 {
+                    game.gameOver = true
+                    game.winner = capturedColor == .white ? .black : .white
+                }
+            }
+        }
+        
+        movingPiece = (piece: piece, from: from, to: to)
+        moveProgress = 0
+        game.board[from.row][from.col] = nil
+        
+        game.currentPlayer = game.currentPlayer == .white ? .black : .white
+        if let gameRoom = game.gameRoom {
+            gameRoom.playerChanged(currentPlayer: game.currentPlayer == .white ? "White" : "Black")
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                moveProgress = 1
+            }
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            var updatedPiece = piece
+            updatedPiece.position = to
+            
+            if (piece.color == .white && to.row == 0) || (piece.color == .black && to.row == 7) {
+                updatedPiece.type = .king
+                updatedPiece.isKing = true
+            }
+            
+            game.board[to.row][to.col] = updatedPiece
+            
+            if settings.timePerMove > 0 {
+                resetTimers()
+            }
+            
+            if let gameRoom = game.gameRoom {
+                gameRoom.sendBoardState(game.board)
+            }
+            
+            game.checkGameOver()
+            
+            movingPiece = nil
+            moveProgress = 0
+            draggedPiece = nil
+            selectedPosition = nil
+            targetPosition = nil
+            possibleMovesOpacity = 0
+            dragOffset = .zero
+        }
+    }
+    
+    private func setInitialTimerValues() {
+        if settings.timePerMove > 0 {
+            whiteTimeRemaining = Int(settings.timePerMove)
+            blackTimeRemaining = Int(settings.timePerMove)
+        }
+    }
+    
+    private func resetTimers() {
+        if settings.timePerMove > 0 {
+            if game.currentPlayer == .white {
+                blackTimeRemaining = Int(settings.timePerMove)
+            } else {
+                whiteTimeRemaining = Int(settings.timePerMove)
+            }
+            isFirstMove = false
+            startTimer()
+        }
+    }
+    
+    private func startTimer() {
+        if isFirstMove || settings.timePerMove <= 0 {
+            return
+        }
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            if game.currentPlayer == .white {
+                if whiteTimeRemaining > 0 {
+                    whiteTimeRemaining -= 1
+                } else {
+                    timer?.invalidate()
+                    game.gameOver = true
+                    game.winner = .black
+                }
+            } else {
+                if blackTimeRemaining > 0 {
+                    blackTimeRemaining -= 1
+                } else {
+                    timer?.invalidate()
+                    game.gameOver = true
+                    game.winner = .white
+                }
+            }
+        }
+    }
+    
+    private func formatTime(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let remainingSeconds = seconds % 60
+        return String(format: "%02d:%02d", minutes, remainingSeconds)
     }
     
     func endgameReason(winner: PieceColor) -> String {
