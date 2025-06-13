@@ -44,7 +44,6 @@ class GameRoom: NSObject, ObservableObject {
     override init() {
         peerID = MCPeerID(displayName: UIDevice.current.name)
         super.init()
-        print("GameRoom: Инициализация GameRoom")
         setupSession()
         setupInitialBoardState()
     }
@@ -53,7 +52,6 @@ class GameRoom: NSObject, ObservableObject {
         session = MCSession(peer: peerID, securityIdentity: nil, encryptionPreference: .required)
         session?.delegate = self
         statusMessage = "Сессия создана"
-        print("GameRoom: Сессия создана для \(peerID.displayName)")
     }
     
     private func setupInitialBoardState() {
@@ -71,7 +69,6 @@ class GameRoom: NSObject, ObservableObject {
     }
     
     func cleanup() {
-        print("GameRoom: Очистка состояния")
 
         for peer in connectedPeers {
             session?.cancelConnectPeer(peer)
@@ -106,20 +103,16 @@ class GameRoom: NSObject, ObservableObject {
     func startBrowsing() {
         cleanup()
         
-        print("GameRoom: Начало поиска комнат")
         browser = MCNearbyServiceBrowser(peer: peerID, serviceType: serviceType)
         browser?.delegate = self
         browser?.startBrowsingForPeers()
         statusMessage = "Поиск комнат..."
-        print("GameRoom: Начало поиска комнат")
-        print("GameRoom: Ищу сервис типа: \(serviceType)")
     }
     
     func sendInitialBoard(_ board: [[Piece?]]) {
         guard let session = session else { return }
         let boardData = try? JSONEncoder().encode(["initialBoard": board])
         try? session.send(boardData ?? Data(), toPeers: session.connectedPeers, with: .reliable)
-        print("GameRoom: Отправлено начальное положение шашек")
     }
     
     func sendGameSettings(_ settings: GameSettings) {
@@ -133,7 +126,6 @@ class GameRoom: NSObject, ObservableObject {
         )
         let data = try? JSONEncoder().encode(["gameSettings": settingsData])
         try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
-        print("GameRoom: Отправлены настройки игры")
     }
     
     func sendBoardState(_ board: [[Piece?]]) {
@@ -166,21 +158,17 @@ class GameRoom: NSObject, ObservableObject {
         guard let session = session else { return }
         let data = try? JSONEncoder().encode(["currentPlayer": currentPlayer])
         try? session.send(data ?? Data(), toPeers: session.connectedPeers, with: .reliable)
-        print("GameRoom: Отправлено обновление цвета: \(currentPlayer)")
     }
     
     func connectToPeer(_ peer: MCPeerID) {
-        print("GameRoom: Отправка приглашения к \(peer.displayName)")
         browser?.invitePeer(peer, to: session!, withContext: nil, timeout: 30)
     }
     
     func connectToRandomRoom() {
         guard let randomPeer = availablePeers.randomElement() else {
-            print("GameRoom: Нет доступных комнат для подключения")
             return
         }
         
-        print("GameRoom: Подключение к случайной комнате: \(randomPeer.displayName)")
         browser?.invitePeer(randomPeer, to: session!, withContext: nil, timeout: 30)
     }
 }
@@ -193,7 +181,6 @@ extension GameRoom: MCSessionDelegate {
                 self.connectedPeers.append(peerID)
                 self.availablePeers.removeAll { $0 == peerID }
                 self.statusMessage = "Connected to \(peerID.displayName)"
-                print("GameRoom: Подключено к \(peerID.displayName)")
 
                 if self.isHost {
                     var pieces: [[Piece?]] = Array(repeating: Array(repeating: nil, count: 8), count: 8)
@@ -215,16 +202,13 @@ extension GameRoom: MCSessionDelegate {
                 
             case .connecting:
                 self.statusMessage = "Connecting to \(peerID.displayName)..."
-                print("GameRoom: Подключение к \(peerID.displayName)...")
                 
             case .notConnected:
                 self.connectedPeers.removeAll { $0 == peerID }
                 self.statusMessage = "Disconnected from \(peerID.displayName)"
-                print("GameRoom: Отключено от \(peerID.displayName)")
                 
             @unknown default:
                 self.statusMessage = "Unknown state for \(peerID.displayName)"
-                print("GameRoom: Неизвестное состояние для \(peerID.displayName)")
             }
         }
     }
@@ -234,17 +218,12 @@ extension GameRoom: MCSessionDelegate {
            let player = playerData["currentPlayer"] {
             DispatchQueue.main.async {
                 self.currentPlayer = player
-                print("GameRoom: Получено обновление цвета от \(peerID.displayName) - \(player)")
             }
         } else if let boardData = try? JSONDecoder().decode(BoardStateData.self, from: data) {
             DispatchQueue.main.async {
                 self.boardState = boardData.boardState
                 self.capturedWhitePieces = boardData.capturedWhite
                 self.capturedBlackPieces = boardData.capturedBlack
-                print("GameRoom: Получено обновление доски от \(peerID.displayName)")
-                print("GameRoom: Захвачено белых шашек: \(boardData.capturedWhite)")
-                print("GameRoom: Захвачено черных шашек: \(boardData.capturedBlack)")
-                print("GameRoom: Текущее состояние доски:")
                 for row in boardData.boardState {
                     print(row.joined(separator: " "))
                 }
@@ -254,7 +233,6 @@ extension GameRoom: MCSessionDelegate {
                   let board = boardData["initialBoard"] {
             DispatchQueue.main.async {
                 self.initialBoard = board
-                print("GameRoom: Получено начальное положение шашек от \(peerID.displayName)")
             }
         } else if let settingsData = try? JSONDecoder().decode([String: GameSettingsData].self, from: data),
                   let settings = settingsData["gameSettings"] {
@@ -274,8 +252,6 @@ extension GameRoom: MCSessionDelegate {
                 
                 NotificationCenter.default.post(name: NSNotification.Name("GameSettingsReceived"), object: gameSettings)
                 NotificationCenter.default.post(name: NSNotification.Name("TimerValuesReceived"), object: timerValues)
-                
-                print("GameRoom: Получены настройки игры от \(peerID.displayName)")
             }
         }
     }
@@ -287,29 +263,24 @@ extension GameRoom: MCSessionDelegate {
 
 extension GameRoom: MCNearbyServiceAdvertiserDelegate {
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
-        print("GameRoom: Получено приглашение от \(peerID.displayName)")
         invitationHandler(true, session)
     }
     
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
-        print("GameRoom: Ошибка создания комнаты: \(error.localizedDescription)")
     }
 }
 
 extension GameRoom: MCNearbyServiceBrowserDelegate {
     func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
-        print("GameRoom: Найдена комната: \(peerID.displayName)")
         if !availablePeers.contains(peerID) {
             availablePeers.append(peerID)
         }
     }
     
     func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
-        print("GameRoom: Потеряна комната: \(peerID.displayName)")
         availablePeers.removeAll { $0 == peerID }
     }
     
     func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
-        print("GameRoom: Ошибка поиска комнат: \(error.localizedDescription)")
     }
 }

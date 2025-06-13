@@ -305,7 +305,6 @@ class CheckersGame: ObservableObject {
             }
         }
         
-        // Check for draw condition (only kings left)
         if whitePieces == whiteKings && blackPieces == blackKings && whiteKings == 1 && blackKings == 1 {
             gameOver = true
             isDraw = true
