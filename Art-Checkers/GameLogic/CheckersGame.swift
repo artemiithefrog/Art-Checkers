@@ -304,14 +304,15 @@ class CheckersGame: ObservableObject {
         board[to.row][to.col] = updatedPiece
         board[from.row][from.col] = nil
         
-        if !hasAnyCaptureMovesForColor(currentPlayer) {
+        if hasAnyCaptureMovesForColor(currentPlayer) {
             if let gameRoom = gameRoom {
                 gameRoom.sendBoardState(board)
-                gameRoom.playerChanged(currentPlayer: currentPlayer == .white ? "Black" : "White")
             }
         } else {
+            currentPlayer = currentPlayer == .white ? .black : .white
             if let gameRoom = gameRoom {
                 gameRoom.sendBoardState(board)
+                gameRoom.playerChanged(currentPlayer: currentPlayer == .white ? "White" : "Black")
             }
         }
         
