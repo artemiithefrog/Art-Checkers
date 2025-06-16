@@ -59,26 +59,50 @@ class CheckersGame: ObservableObject {
     }
     
     func getCaptureMovesForPiece(_ piece: Piece, from: Position) -> Set<Position> {
-        if piece.type == .king {
-            return getKingCaptureMoves(for: piece, from: from)
-        }
-        
         var moves: Set<Position> = []
-        let directions = piece.type == .king ? [-1, 1] : [piece.color == .white ? -1 : 1]
         
-        for rowDir in directions {
-            for colDir in [-1, 1] {
-                let captureRow = from.row + rowDir * 2
-                let captureCol = from.col + colDir * 2
+        if piece.type == .king {
+            let directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+            for (rowDir, colDir) in directions {
+                var currentRow = from.row + rowDir
+                var currentCol = from.col + colDir
+                var foundOpponent = false
+                var captureRow = -1
+                var captureCol = -1
                 
-                if captureRow >= 0 && captureRow < 8 && captureCol >= 0 && captureCol < 8 {
-                    let capturedRow = from.row + rowDir
-                    let capturedCol = from.col + colDir
+                while currentRow >= 0 && currentRow < 8 && currentCol >= 0 && currentCol < 8 {
+                    if let targetPiece = board[currentRow][currentCol] {
+                        if foundOpponent {
+                            break
+                        }
+                        if targetPiece.color == piece.color {
+                            break
+                        }
+                        foundOpponent = true
+                        captureRow = currentRow
+                        captureCol = currentCol
+                    } else if foundOpponent {
+                        moves.insert(Position(row: currentRow, col: currentCol))
+                    }
+                    currentRow += rowDir
+                    currentCol += colDir
+                }
+            }
+        } else {
+            let directions = piece.color == .white ? [-1] : [1]
+            for rowDir in directions {
+                for colDir in [-1, 1] {
+                    let captureRow = from.row + rowDir
+                    let captureCol = from.col + colDir
+                    let landingRow = captureRow + rowDir
+                    let landingCol = captureCol + colDir
                     
-                    if let capturedPiece = board[capturedRow][capturedCol],
-                       capturedPiece.color != piece.color,
-                       board[captureRow][captureCol] == nil {
-                        moves.insert(Position(row: captureRow, col: captureCol))
+                    if landingRow >= 0 && landingRow < 8 && landingCol >= 0 && landingCol < 8 {
+                        if let capturedPiece = board[captureRow][captureCol],
+                           capturedPiece.color != piece.color,
+                           board[landingRow][landingCol] == nil {
+                            moves.insert(Position(row: landingRow, col: landingCol))
+                        }
                     }
                 }
             }
@@ -159,8 +183,20 @@ class CheckersGame: ObservableObject {
         let rowDiff = to.row - from.row
         let colDiff = to.col - from.col
         
-        if abs(rowDiff) != 1 || abs(colDiff) != 1 {
-            return false
+        if abs(rowDiff) != abs(colDiff) { return false }
+        
+        let rowDir = rowDiff > 0 ? 1 : -1
+        let colDir = colDiff > 0 ? 1 : -1
+        
+        var currentRow = from.row + rowDir
+        var currentCol = from.col + colDir
+        
+        while currentRow != to.row && currentCol != to.col {
+            if board[currentRow][currentCol] != nil {
+                return false
+            }
+            currentRow += rowDir
+            currentCol += colDir
         }
         
         return true
@@ -177,25 +213,23 @@ class CheckersGame: ObservableObject {
         
         var currentRow = from.row + rowDir
         var currentCol = from.col + colDir
-        var foundPiece = false
+        var foundOpponent = false
         
         while currentRow != to.row && currentCol != to.col {
             if let piece = board[currentRow][currentCol] {
-                if !foundPiece {
-                    if piece.color != board[from.row][from.col]!.color {
-                        foundPiece = true
-                    } else {
-                        return false
-                    }
-                } else {
+                if foundOpponent {
                     return false
                 }
+                if piece.color == currentPlayer {
+                    return false
+                }
+                foundOpponent = true
             }
             currentRow += rowDir
             currentCol += colDir
         }
         
-        return foundPiece
+        return foundOpponent
     }
     
     func makeMove(from: Position, to: Position) {
@@ -365,7 +399,6 @@ class CheckersGame: ObservableObject {
             if let lastCapture = lastCapturePosition, lastCapture == piece.position {
                 return getCaptureMovesForPiece(piece, from: piece.position)
             }
-            
             return getCaptureMovesForPiece(piece, from: piece.position)
         }
         
@@ -373,13 +406,17 @@ class CheckersGame: ObservableObject {
         if piece.type == .king {
             let directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
             for (rowDir, colDir) in directions {
-                let newRow = piece.position.row + rowDir
-                let newCol = piece.position.col + colDir
+                var currentRow = piece.position.row + rowDir
+                var currentCol = piece.position.col + colDir
                 
-                if newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8 {
-                    if board[newRow][newCol] == nil {
-                        moves.insert(Position(row: newRow, col: newCol))
+                while currentRow >= 0 && currentRow < 8 && currentCol >= 0 && currentCol < 8 {
+                    if board[currentRow][currentCol] == nil {
+                        moves.insert(Position(row: currentRow, col: currentCol))
+                    } else {
+                        break
                     }
+                    currentRow += rowDir
+                    currentCol += colDir
                 }
             }
         } else {
