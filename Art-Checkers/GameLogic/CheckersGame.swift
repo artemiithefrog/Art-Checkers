@@ -89,20 +89,18 @@ class CheckersGame: ObservableObject {
                 }
             }
         } else {
-            let directions = piece.color == .white ? [-1] : [1]
-            for rowDir in directions {
-                for colDir in [-1, 1] {
-                    let captureRow = from.row + rowDir
-                    let captureCol = from.col + colDir
-                    let landingRow = captureRow + rowDir
-                    let landingCol = captureCol + colDir
-                    
-                    if landingRow >= 0 && landingRow < 8 && landingCol >= 0 && landingCol < 8 {
-                        if let capturedPiece = board[captureRow][captureCol],
-                           capturedPiece.color != piece.color,
-                           board[landingRow][landingCol] == nil {
-                            moves.insert(Position(row: landingRow, col: landingCol))
-                        }
+            let directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+            for (rowDir, colDir) in directions {
+                let captureRow = from.row + rowDir
+                let captureCol = from.col + colDir
+                let landingRow = captureRow + rowDir
+                let landingCol = captureCol + colDir
+                
+                if landingRow >= 0 && landingRow < 8 && landingCol >= 0 && landingCol < 8 {
+                    if let capturedPiece = board[captureRow][captureCol],
+                       capturedPiece.color != piece.color,
+                       board[landingRow][landingCol] == nil {
+                        moves.insert(Position(row: landingRow, col: landingCol))
                     }
                 }
             }
@@ -127,6 +125,19 @@ class CheckersGame: ObservableObject {
         return false
     }
     
+    func hasAnyCaptureMovesForColor(_ color: PieceColor) -> Bool {
+        for row in 0..<8 {
+            for col in 0..<8 {
+                if let piece = board[row][col],
+                   piece.color == color,
+                   hasCaptureMovesForPiece(piece, from: Position(row: row, col: col)) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+    
     func isValidMove(from: Position, to: Position) -> Bool {
         guard let piece = board[from.row][from.col] else { return false }
         
@@ -139,8 +150,8 @@ class CheckersGame: ObservableObject {
         
         if board[to.row][to.col] != nil { return false }
         
-        if hasAnyCaptureMoves() {
-            if let lastCapture = lastCapturePosition, lastCapture == from {
+        if let lastCapture = lastCapturePosition {
+            if lastCapture == from {
                 if piece.type == .king {
                     return isValidKingCapture(from: from, to: to)
                 }
@@ -153,7 +164,10 @@ class CheckersGame: ObservableObject {
                 if capturedPiece.color == piece.color { return false }
                 return true
             }
-            
+            return false
+        }
+        
+        if hasAnyCaptureMovesForColor(currentPlayer) {
             if abs(rowDiff) == 2 && abs(colDiff) == 2 {
                 let capturedRow = (from.row + to.row) / 2
                 let capturedCol = (from.col + to.col) / 2
@@ -162,7 +176,6 @@ class CheckersGame: ObservableObject {
                 if capturedPiece.color == piece.color { return false }
                 return true
             }
-            
             return false
         }
         
@@ -258,6 +271,24 @@ class CheckersGame: ObservableObject {
             }
             
             lastCapturePosition = to
+            
+            var updatedPiece = piece
+            updatedPiece.position = to
+            
+            if (piece.color == .white && to.row == 0) || (piece.color == .black && to.row == 7) {
+                updatedPiece.type = .king
+                updatedPiece.isKing = true
+            }
+            
+            board[to.row][to.col] = updatedPiece
+            board[from.row][from.col] = nil
+            
+            if hasCaptureMovesForPiece(updatedPiece, from: to) {
+                if let gameRoom = gameRoom {
+                    gameRoom.sendBoardState(board)
+                }
+                return
+            }
         } else {
             lastCapturePosition = nil
         }
@@ -273,9 +304,15 @@ class CheckersGame: ObservableObject {
         board[to.row][to.col] = updatedPiece
         board[from.row][from.col] = nil
         
-        if let gameRoom = gameRoom {
-            gameRoom.sendBoardState(board)
-            gameRoom.playerChanged(currentPlayer: currentPlayer == .white ? "White" : "Black")
+        if !hasAnyCaptureMovesForColor(currentPlayer) {
+            if let gameRoom = gameRoom {
+                gameRoom.sendBoardState(board)
+                gameRoom.playerChanged(currentPlayer: currentPlayer == .white ? "Black" : "White")
+            }
+        } else {
+            if let gameRoom = gameRoom {
+                gameRoom.sendBoardState(board)
+            }
         }
         
         checkGameOver()
@@ -396,8 +433,12 @@ class CheckersGame: ObservableObject {
     
     func getPossibleMoves(for piece: Piece) -> Set<Position> {
         if hasAnyCaptureMoves() {
-            if let lastCapture = lastCapturePosition, lastCapture == piece.position {
-                return getCaptureMovesForPiece(piece, from: piece.position)
+            if let lastCapture = lastCapturePosition {
+                if lastCapture == piece.position {
+                    return getCaptureMovesForPiece(piece, from: piece.position)
+                } else {
+                    return []
+                }
             }
             return getCaptureMovesForPiece(piece, from: piece.position)
         }

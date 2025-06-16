@@ -463,7 +463,7 @@ struct CheckersBoardView: View {
                 }
             }
             
-                if let capturedPiece = game.board[capturedRow][capturedCol] {
+            if let capturedPiece = game.board[capturedRow][capturedCol] {
                 let capturedColor = capturedPiece.color
                 game.board[capturedRow][capturedCol] = nil
 
@@ -477,8 +477,10 @@ struct CheckersBoardView: View {
                 }
 
                 if remainingPieces == 0 {
-                    game.gameOver = true
-                    game.winner = capturedColor == .white ? .black : .white
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        game.gameOver = true
+                        game.winner = capturedColor == .white ? .black : .white
+                    }
                 }
             }
         }
@@ -486,11 +488,6 @@ struct CheckersBoardView: View {
         movingPiece = (piece: piece, from: from, to: to)
         moveProgress = 0
         game.board[from.row][from.col] = nil
-        
-        game.currentPlayer = game.currentPlayer == .white ? .black : .white
-        if let gameRoom = game.gameRoom {
-            gameRoom.playerChanged(currentPlayer: game.currentPlayer == .white ? "White" : "Black")
-        }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -508,6 +505,25 @@ struct CheckersBoardView: View {
             }
             
             game.board[to.row][to.col] = updatedPiece
+            
+            if abs(rowDiff) == 2 && abs(colDiff) == 2 && game.hasCaptureMovesForPiece(updatedPiece, from: to) {
+                if let gameRoom = game.gameRoom {
+                    gameRoom.sendBoardState(game.board)
+                }
+                movingPiece = nil
+                moveProgress = 0
+                draggedPiece = nil
+                selectedPosition = nil
+                targetPosition = nil
+                possibleMovesOpacity = 0
+                dragOffset = .zero
+                return
+            }
+            
+            game.currentPlayer = game.currentPlayer == .white ? .black : .white
+            if let gameRoom = game.gameRoom {
+                gameRoom.playerChanged(currentPlayer: game.currentPlayer == .white ? "White" : "Black")
+            }
             
             if settings.timePerMove > 0 {
                 resetTimers()
